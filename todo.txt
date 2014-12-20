@@ -1,0 +1,10 @@
++ sprawdzanie czy zmienna jest zainicjowana gdy siê jej u¿ywa
++ strict mode
++ brak nawiasów, brak œredników
++ zmienne po przecinku
++ a = b = c;
++ optymalizacja: SET_VAR, X; POP -> POP_VAR, X
++ optymalizacja: obliczanie sta³ych
++ optymalizacja: string pooling
+
+int a = 3+7*4-8/2;

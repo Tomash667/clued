@@ -1,0 +1,29 @@
+print("Podaj imie: ");
+string s = getstr();
+print("Witaj "+s+"!\n");
+print("Podaj nazwisko: ");
+print("Witaj "+s+" "+getstr()+"!");
+pause();
+
+/*
+SET_VARS, 1,
+PUSH_CSTR, 0,
+CALL, F_PRINT,
+CALL, F_GETSTR,
+SET_VAR, 0,
+POP,
+PUSH_CSTR, 1,
+PUSH_VAR, 0,
+ADD,
+CALL, F_PRINT,
+CALL, F_PAUSE,
+RET
+
+var | expr
+var = type name [= expr] ;
+type = string
+name = ?
+expr = exp [op exp] ;
+exp = var | call
+call = func_name ( exp )
+*/
