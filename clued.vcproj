@@ -206,27 +206,39 @@
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
 			>
 			<File
-				RelativePath=".\1.txt"
-				>
-			</File>
-			<File
-				RelativePath=".\2.txt"
-				>
-			</File>
-			<File
-				RelativePath=".\3.txt"
-				>
-			</File>
-			<File
-				RelativePath=".\4.txt"
-				>
-			</File>
-			<File
-				RelativePath=".\5.txt"
+				RelativePath=".\readme.txt"
 				>
 			</File>
 			<File
 				RelativePath=".\todo.txt"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="Tests"
+			>
+			<File
+				RelativePath=".\tests\1.txt"
+				>
+			</File>
+			<File
+				RelativePath=".\tests\2.txt"
+				>
+			</File>
+			<File
+				RelativePath=".\tests\3.txt"
+				>
+			</File>
+			<File
+				RelativePath=".\tests\4.txt"
+				>
+			</File>
+			<File
+				RelativePath=".\tests\5.txt"
+				>
+			</File>
+			<File
+				RelativePath=".\tests\6.txt"
 				>
 			</File>
 		</Filter>

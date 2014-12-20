@@ -2,6 +2,7 @@
 #include <conio.h>
 #include "Base.h"
 #include <iostream>
+#include <cmath>
 
 enum Op : byte
 {
@@ -17,6 +18,7 @@ enum Op : byte
 	DIV,
 	NEG,
 	CALL,
+	TO_STRING,
 	RET
 };
 
@@ -141,7 +143,8 @@ enum Func : byte
 	F_PRINT,
 	F_PAUSE,
 	F_GETSTR,
-	F_GETINT
+	F_GETINT,
+	F_POW
 };
 
 typedef void (*VoidF)();
@@ -188,6 +191,14 @@ void f_getint()
 	stack.push_back(Var(a));
 }
 
+void f_pow()
+{
+	int a = stack.back().Int;
+	stack.pop_back();
+	int b = stack.back().Int;
+	stack.back().Int = (int)pow((float)a, b);
+}
+
 #define ARGS0() 0, {V_VOID, V_VOID}
 #define ARGS1(a1) 1, {a1, V_VOID}
 #define ARGS2(a1, a2) 2, {a1, a2}
@@ -196,7 +207,8 @@ Function funcs[] = {
 	"print", V_VOID, ARGS1(V_STRING), f_print,
 	"pause", V_VOID, ARGS0(), f_pause,
 	"getstr", V_STRING, ARGS0(), f_getstr,
-	"getint", V_INT, ARGS0(), f_getint
+	"getint", V_INT, ARGS0(), f_getint,
+	"pow", V_INT, ARGS2(V_INT, V_INT), f_pow
 };
 
 void run(byte* code)
@@ -257,7 +269,7 @@ void run(byte* code)
 					if(v2.type == V_STRING)
 						s2 = v2.str->s.c_str();
 					else
-						s2 = Format("%d", v.Int);
+						s2 = Format("%d", v2.Int);
 					cstring s = Format("%s%s", s2, s1);
 					if(v.type == V_STRING)
 						v.str->Release();
@@ -321,6 +333,19 @@ void run(byte* code)
 			funcs[*c].f();
 			++c;
 			break;
+		case TO_STRING:
+			{
+				Var& v = stack.back();
+				if(v.type == V_INT)
+				{
+					int Int = v.Int;
+					v.str = StrPool.Get();
+					v.str->s = Format("%d", Int);
+					v.str->refs = 1;
+					v.type = V_STRING;
+				}
+			}
+			break;
 		case RET:
 			return;
 		}
@@ -346,7 +371,8 @@ struct Node
 		N_VAR,
 		N_CSTR,
 		N_SET,
-		N_INT
+		N_INT,
+		N_CAST
 	} op;
 	int id;
 	vector<Node*> nodes;
@@ -357,7 +383,7 @@ vector<ParseVar> vars;
 vector<Node*> top_nodes;
 vector<Node*> node_out, node_stack;
 
-Node* parse_expr(char funcend);
+Node* parse_expr(char funcend, char funcend2=0);
 
 Node* parse_statement()
 {
@@ -388,7 +414,17 @@ Node* parse_statement()
 					t.Throw(Format("Empty statement as %d arg of function %s.", i+1, f.name));
 				if(!CanCast(f.args[i], result->return_type))
 					t.Throw(Format("Can't cast from %s to %s for arg %d in function call %s.", var_name[result->return_type], var_name[f.args[i]], i+1, f.name));
-				fnode->nodes.push_back(result);
+				if(f.args[i] != result->return_type)
+				{
+					Node* cast = new Node;
+					cast->op = Node::N_CAST;
+					cast->id = TO_STRING;
+					cast->return_type = f.args[i];
+					cast->nodes.push_back(result);
+					fnode->nodes.push_back(cast);
+				}
+				else
+					fnode->nodes.push_back(result);
 				t.Next();
 			}
 		}
@@ -474,10 +510,10 @@ Node* parse_statement()
 	return NULL;
 }
 
-Node* parse_expr(char funcend)
+Node* parse_expr(char funcend, char funcend2)
 {
 	// expr -> expr [op expr]
-	if(t.IsSymbol(funcend))
+	if(t.IsSymbol(funcend) || t.IsSymbol(funcend2))
 		return NULL;
 
 	Node* node = new Node;
@@ -487,7 +523,7 @@ Node* parse_expr(char funcend)
 		Node* result = parse_statement();
 		node->nodes.push_back(result);
 
-		if(t.IsSymbol(funcend))
+		if(t.IsSymbol(funcend) || t.IsSymbol(funcend2))
 			break;
 		else if(t.IsSymbol('='))
 		{
@@ -606,40 +642,53 @@ void parse_exprl()
 
 void parse_vard()
 {
-	// vard -> var_type name [= expr] ;
+	// vard -> var_type name [= expr] [, name [= expr]] ... ;
 	VAR type = (VAR)t.GetKeywordId();
-	int line = t.GetLine()+1;
-
 	t.Next();
-	const string& s = t.MustGetItem();
-	// check is unique
-	for(vector<ParseVar>::iterator it = vars.begin(), end = vars.end(); it != end; ++it)
-	{
-		if(it->name == s)
-			t.Throw(Format("Variable '%s' already declared at line %d with type 'string'.", s.c_str(), it->line));
-	}
-	int vi = vars.size();
-	ParseVar& v = Add1(vars);
-	v.name = s;
-	v.type = type;
-	v.line = line;
 
-	t.Next();
-	if(t.IsSymbol('='))
+	do
 	{
+		const string& s = t.MustGetItem();
+
+		// check is unique
+		for(vector<ParseVar>::iterator it = vars.begin(), end = vars.end(); it != end; ++it)
+		{
+			if(it->name == s)
+				t.Throw(Format("Variable '%s' already declared at line %d with type '%s'.", s.c_str(), it->line, var_name[it->type]));
+		}
+		int vi = vars.size();
+		ParseVar& v = Add1(vars);
+		v.name = s;
+		v.type = type;
+		v.line = t.GetLine();
+
 		t.Next();
-		Node* result = parse_expr(';');
-		if(!result)
-			t.Throw(Format("Empty assign expression for var %s '%s'.", var_name[v.type], v.name.c_str()));
-		if(!CanCast(type, result->return_type))
-			t.Throw(Format("Can't assign to var %s '%s' value of type '%s'.", var_name[v.type], v.name.c_str(), var_name[result->return_type]));
-		Node* node = new Node;
-		node->op = Node::N_SET;
-		node->id = vi;
-		node->return_type = v.type;
-		node->nodes.push_back(result);
-		top_nodes.push_back(node);
+
+		// assingment
+		if(t.IsSymbol('='))
+		{
+			t.Next();
+			Node* result = parse_expr(';', ',');
+			if(!result)
+				t.Throw(Format("Empty assign expression for var %s '%s'.", var_name[v.type], v.name.c_str()));
+			if(!CanCast(type, result->return_type))
+				t.Throw(Format("Can't assign to var %s '%s' value of type '%s'.", var_name[v.type], v.name.c_str(), var_name[result->return_type]));
+			Node* node = new Node;
+			node->op = Node::N_SET;
+			node->id = vi;
+			node->return_type = v.type;
+			node->nodes.push_back(result);
+			top_nodes.push_back(node);
+		}
+
+		// next variable
+		if(t.IsSymbol(','))
+			t.Next();
+		else
+			break;
 	}
+	while(1);
+
 	t.AssertSymbol(';');
 }
 
@@ -668,6 +717,7 @@ void parse_node(Node* node, bool top)
 		bcode.push_back(node->id);
 		break;
 	case Node::N_OP:
+	case Node::N_CAST:
 		bcode.push_back(node->id);
 		break;
 	case Node::N_VAR:
@@ -732,7 +782,7 @@ int main()
 {
 	try
 	{
-		parse("4.txt");
+		parse("tests/6.txt");
 		run(&bcode[0]);
 	}
 	catch(cstring err)
