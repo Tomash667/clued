@@ -1,10 +1,5 @@
-+ brak podzia³u na V_STR i V_CSTR w VAR
-+ a = 7;
-+ print(3);
-+ ujemny litera³ "int a = -7;"
-+ negacja
-
-+ sprawdzanie czy zmienna jest zainicjowana gdy siê jej u¿ywa
++ print(3); (TO_STRING)
++ sprawdzanie czy zmienna jest zainicjowana gdy siê jej u¿ywa,
 + strict mode
 + brak nawiasów, brak œredników
 + zmienne po przecinku
@@ -12,5 +7,11 @@
 + optymalizacja: SET_VAR, X; POP -> POP_VAR, X
 + optymalizacja: obliczanie sta³ych
 + optymalizacja: string pooling
++ wykrywanie nieu¿ywanych zmiennych
++ funkcje
++ wykrywanie nieu¿ywanych funkcji
++ zwalnianie pamiêci
++ float
++ char
 
 int a = 3+7*4-8/2;

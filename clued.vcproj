@@ -170,6 +170,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\Run.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\Tokenizer.cpp"
 				>
 			</File>
@@ -189,6 +193,10 @@
 			</File>
 			<File
 				RelativePath=".\Tokenizer.h"
+				>
+			</File>
+			<File
+				RelativePath=".\Var.h"
 				>
 			</File>
 		</Filter>

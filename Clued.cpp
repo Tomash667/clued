@@ -5,8 +5,9 @@
 
 enum Op : byte
 {
-	PUSH_CSTR,
 	PUSH_VAR,
+	PUSH_CSTR,
+	PUSH_INT,
 	POP,
 	SET_VARS,
 	SET_VAR,
@@ -14,6 +15,7 @@ enum Op : byte
 	SUB,
 	MUL,
 	DIV,
+	NEG,
 	CALL,
 	RET
 };
@@ -47,15 +49,13 @@ enum VAR
 {
 	V_VOID,
 	V_INT,
-	V_CSTR,
-	V_STR
+	V_STRING
 };
 
 cstring var_name[] = {
 	"void",
 	"int",
-	"cstr",
-	"str"
+	"string"
 };
 
 bool CanCast(VAR to, VAR from)
@@ -68,10 +68,8 @@ bool CanCast(VAR to, VAR from)
 	case V_VOID:
 	case V_INT:
 		return false;
-	case V_CSTR:
-		return from == V_STR || from == V_INT;
-	case V_STR:
-		return from == V_CSTR || from == V_INT;
+	case V_STRING:
+		return from != V_VOID;
 	default:
 		return false;
 	}
@@ -84,8 +82,8 @@ VAR CanOp(VAR a, Op op, VAR b)
 	case ADD:
 		if(a == V_INT && b == V_INT)
 			return V_INT;
-		else if((a == V_STR || a == V_CSTR || a == V_INT) && (b == V_STR || b == V_CSTR || b == V_INT))
-			return V_STR;
+		else if(a == V_STRING || b == V_STRING)
+			return V_STRING;
 		else
 			return V_VOID;
 	case SUB:
@@ -100,7 +98,11 @@ VAR CanOp(VAR a, Op op, VAR b)
 	}
 }
 
-struct String
+struct Str;
+
+ObjectPool<Str> StrPool;
+
+struct Str
 {
 	string s;
 	int refs;
@@ -109,7 +111,7 @@ struct String
 	{
 		--refs;
 		if(refs == 0)
-			delete this;
+			StrPool.Free(this);
 	}
 };
 
@@ -117,21 +119,19 @@ struct Var
 {
 	union
 	{
-		cstring cstr;
-		String* str;
+		Str* str;
 		int Int;
 	};
 	VAR type;
 
 	Var() : type(V_VOID) {}
-	Var(cstring cstr) : cstr(cstr), type(V_CSTR) {}
-	Var(String* str) : str(str), type(V_STR) {str->refs++;}
+	Var(Str* str) : str(str), type(V_STRING) {str->refs++;}
 	Var(int Int) : Int(Int), type(V_INT) {}
 	Var(const Var& v)
 	{
 		type = v.type;
-		cstr = v.cstr;
-		if(type == V_STR)
+		str = v.str;
+		if(type == V_STRING)
 			str->refs++;
 	}
 };
@@ -157,19 +157,14 @@ struct Function
 	VoidF f;
 };
 
-vector<string> strs;
+vector<Str*> strs;
 vector<Var> stack;
 
 void f_print()
 {
 	Var& v = stack.back();
-	if(v.type == V_STR)
-	{
-		printf(v.str->s.c_str());
-		v.str->Release();
-	}
-	else
-		printf(v.cstr);
+	printf(v.str->s.c_str());
+	v.str->Release();
 	stack.pop_back();
 }
 
@@ -180,7 +175,7 @@ void f_pause()
 
 void f_getstr()
 {
-	String* s = new String;
+	Str* s = StrPool.Get();
 	std::cin >> s->s;
 	s->refs = 1;
 	stack.push_back(Var(s));
@@ -198,9 +193,9 @@ void f_getint()
 #define ARGS2(a1, a2) 2, {a1, a2}
 
 Function funcs[] = {
-	"print", V_VOID, ARGS1(V_CSTR), f_print,
+	"print", V_VOID, ARGS1(V_STRING), f_print,
 	"pause", V_VOID, ARGS0(), f_pause,
-	"getstr", V_STR, ARGS0(), f_getstr,
+	"getstr", V_STRING, ARGS0(), f_getstr,
 	"getint", V_INT, ARGS0(), f_getint
 };
 
@@ -215,15 +210,22 @@ void run(byte* code)
 		switch(op)
 		{
 		case PUSH_CSTR:
-			stack.push_back(Var(strs[*c].c_str()));
+			stack.push_back(Var(strs[*c]));
 			++c;
 			break;
 		case PUSH_VAR:
 			stack.push_back(Var(vars[*c]));
 			++c;
 			break;
+		case PUSH_INT:
+			{
+				int a = *(int*)c;
+				c += 4;
+				stack.push_back(a);
+			}
+			break;
 		case POP:
-			if(stack.back().type == V_STR)
+			if(stack.back().type == V_STRING)
 				stack.back().str->Release();
 			stack.pop_back();
 			break;
@@ -235,7 +237,7 @@ void run(byte* code)
 			{
 				Var& v = vars[*c];
 				++c;
-				if(v.type == V_STR)
+				if(v.type == V_STRING)
 					v.str->Release();
 				v = Var(stack.back());
 			}
@@ -245,40 +247,36 @@ void run(byte* code)
 				Var v = stack.back();
 				stack.pop_back();
 				Var& v2 = stack.back();
-				if(v.type == V_STR || v.type == V_CSTR || v2.type == V_STR || v2.type == V_CSTR)
+				if(v.type == V_STRING || v2.type == V_STRING)
 				{
 					cstring s1, s2;
-					if(v.type == V_STR)
+					if(v.type == V_STRING)
 						s1 = v.str->s.c_str();
-					else if(v.type == V_CSTR)
-						s1 = v.cstr;
 					else
 						s1 = Format("%d", v.Int);
-					if(v2.type == V_STR)
+					if(v2.type == V_STRING)
 						s2 = v2.str->s.c_str();
-					else if(v2.type == V_CSTR)
-						s2 = v2.cstr;
 					else
 						s2 = Format("%d", v.Int);
 					cstring s = Format("%s%s", s2, s1);
-					if(v.type == V_STR)
+					if(v.type == V_STRING)
 						v.str->Release();
-					if(v2.type == V_STR)
+					if(v2.type == V_STRING)
 					{
 						if(v2.str->refs == 1)
 							v2.str->s = s;
 						else
 						{
 							v2.str->Release();
-							v2.str = new String;
+							v2.str = StrPool.Get();
 							v2.str->refs = 1;
 							v2.str->s = s;
 						}
 					}
 					else
 					{
-						v2.type = V_STR;
-						v2.str = new String;
+						v2.type = V_STRING;
+						v2.str = StrPool.Get();
 						v2.str->refs = 1;
 						v2.str->s = s;
 					}
@@ -316,6 +314,9 @@ void run(byte* code)
 				v2.Int /= v.Int;
 			}
 			break;
+		case NEG:
+			stack.back().Int = -stack.back().Int;
+			break;
 		case CALL:
 			funcs[*c].f();
 			++c;
@@ -344,7 +345,8 @@ struct Node
 		N_OP,
 		N_VAR,
 		N_CSTR,
-		N_SET
+		N_SET,
+		N_INT
 	} op;
 	int id;
 	vector<Node*> nodes;
@@ -354,6 +356,123 @@ struct Node
 vector<ParseVar> vars;
 vector<Node*> top_nodes;
 vector<Node*> node_out, node_stack;
+
+Node* parse_expr(char funcend);
+
+Node* parse_statement()
+{
+	// statement ->
+	//		var
+	//		func
+	//		const
+	if(t.IsKeywordGroup(1))
+	{
+		// func
+		int fid = t.GetKeywordId();
+		const Function& f = funcs[fid];
+		Node* fnode = new Node;
+		fnode->op = Node::N_CALL;
+		fnode->id = fid;
+		fnode->return_type = f.return_type;
+		// (
+		t.Next();
+		t.AssertSymbol('(');
+		t.Next();
+		// args
+		if(f.arg_count > 0)
+		{
+			for(int i=0; i<f.arg_count; ++i)
+			{
+				Node* result = parse_expr(i < f.arg_count-1 ? ',' : ')');
+				if(!result)
+					t.Throw(Format("Empty statement as %d arg of function %s.", i+1, f.name));
+				if(!CanCast(f.args[i], result->return_type))
+					t.Throw(Format("Can't cast from %s to %s for arg %d in function call %s.", var_name[result->return_type], var_name[f.args[i]], i+1, f.name));
+				fnode->nodes.push_back(result);
+				t.Next();
+			}
+		}
+		else
+		{
+			t.AssertSymbol(')');
+			t.Next();
+		}
+		return fnode;
+	}
+	else if(t.IsItem())
+	{
+		// var
+		const string& s = t.MustGetItem();
+		int index = 0;
+		bool ok = false;
+		for(vector<ParseVar>::iterator it = vars.begin(), end = vars.end(); it != end; ++it, ++index)
+		{
+			if(s == it->name)
+			{
+				ok = true;
+				break;
+			}
+		}
+		if(!ok)
+			t.Unexpected();
+		ParseVar& v = vars[index];
+		Node* vnode = new Node;
+		vnode->op = Node::N_VAR;
+		vnode->id = index;
+		vnode->return_type = v.type;
+		t.Next();
+		return vnode;
+	}
+	else if(t.IsString())
+	{
+		int si = strs.size();
+		Str* s = StrPool.Get();
+		s->refs = 1;
+		Unescape(t.GetString(), s->s);
+		strs.push_back(s);
+		t.Next();
+		Node* csnode = new Node;
+		csnode->op = Node::N_CSTR;
+		csnode->id = si;
+		csnode->return_type = V_STRING;
+		return csnode;
+	}
+	else if(t.IsInt())
+	{
+		Node* inode = new Node;
+		inode->op = Node::N_INT;
+		inode->id = t.GetInt();
+		inode->return_type = V_INT;
+		t.Next();
+		return inode;
+	}
+	else if(t.IsSymbol('-'))
+	{
+		// -a
+		t.Next();
+		Node* result = parse_statement();
+		if(result->return_type == V_INT)
+		{
+			Node* node = new Node;
+			node->op = Node::N_OP;
+			node->id = NEG;
+			node->return_type = V_INT;
+			node->nodes.push_back(result);
+			return node;
+		}
+	}
+	else if(t.IsSymbol('+'))
+	{
+		// +a
+		Node* result = parse_statement();
+		if(result->return_type == V_INT)
+			return result;
+	}
+	
+	t.Unexpected();
+	assert(0);
+	return NULL;
+}
 
 Node* parse_expr(char funcend)
 {
@@ -365,78 +484,8 @@ Node* parse_expr(char funcend)
 
 	while(true)
 	{
-		if(t.IsKeywordGroup(1))
-		{
-			// func
-			int fid = t.GetKeywordId();
-			const Function& f = funcs[fid];
-			Node* fnode = new Node;
-			fnode->op = Node::N_CALL;
-			fnode->id = fid;
-			fnode->return_type = f.return_type;
-			// (
-			t.Next();
-			t.AssertSymbol('(');
-			t.Next();
-			// args
-			if(f.arg_count > 0)
-			{
-				for(int i=0; i<f.arg_count; ++i)
-				{
-					Node* result = parse_expr(i < f.arg_count-1 ? ',' : ')');
-					if(!result)
-						t.Throw(Format("Empty statement as %d arg of function %s.", i+1, f.name));
-					if(!CanCast(f.args[i], result->return_type))
-						t.Throw(Format("Can't cast from %s to %s for arg %d in function call %s.", var_name[result->return_type], var_name[f.args[i]], i+1, f.name));
-					fnode->nodes.push_back(result);
-					t.Next();
-				}
-			}
-			else
-			{
-				t.AssertSymbol(')');
-				t.Next();
-			}
-			node->nodes.push_back(fnode);
-		}
-		else if(t.IsItem())
-		{
-			// var
-			const string& s = t.MustGetItem();
-			int index = 0;
-			bool ok = false;
-			for(vector<ParseVar>::iterator it = vars.begin(), end = vars.end(); it != end; ++it, ++index)
-			{
-				if(s == it->name)
-				{
-					ok = true;
-					break;
-				}
-			}
-			if(!ok)
-				t.Unexpected();
-			ParseVar& v = vars[index];
-			Node* vnode = new Node;
-			vnode->op = Node::N_VAR;
-			vnode->id = index;
-			vnode->return_type = v.type;
-			node->nodes.push_back(vnode);
-			t.Next();
-		}
-		else if(t.IsString())
-		{
-			int si = strs.size();
-			string& s = Add1(strs);
-			Unescape(t.GetString(), s);
-			t.Next();
-			Node* csnode = new Node;
-			csnode->op = Node::N_CSTR;
-			csnode->id = si;
-			csnode->return_type = V_CSTR;
-			node->nodes.push_back(csnode);
-		}
-		else
-			t.Unexpected();
+		Node* result = parse_statement();
+		node->nodes.push_back(result);
 
 		if(t.IsSymbol(funcend))
 			break;
@@ -629,6 +678,13 @@ void parse_node(Node* node, bool top)
 		bcode.push_back(SET_VAR);
 		bcode.push_back(node->id);
 		break;
+	case Node::N_INT:
+		bcode.push_back(PUSH_INT);
+		bcode.push_back(node->id & 0xFF);
+		bcode.push_back((node->id & 0xFF00) >> 8);
+		bcode.push_back((node->id & 0xFF0000) >> 16);
+		bcode.push_back((node->id & 0xFF000000) >> 24);
+		break;
 	default:
 		assert(0);
 		break;
@@ -646,7 +702,7 @@ void parse(cstring file)
 	for(int i=0, count=countof(funcs); i<count; ++i)
 		t.AddKeyword(funcs[i].name, i, 1);
 	t.AddKeyword("int", V_INT, 2);
-	t.AddKeyword("string", V_STR, 2);
+	t.AddKeyword("string", V_STRING, 2);
 	t.FromFile(file);
 
 	while(true)
@@ -676,7 +732,7 @@ int main()
 {
 	try
 	{
-		parse("3.txt");
+		parse("4.txt");
 		run(&bcode[0]);
 	}
 	catch(cstring err)
