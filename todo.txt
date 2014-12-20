@@ -1,3 +1,9 @@
++ brak podzia³u na V_STR i V_CSTR w VAR
++ a = 7;
++ print(3);
++ ujemny litera³ "int a = -7;"
++ negacja
+
 + sprawdzanie czy zmienna jest zainicjowana gdy siê jej u¿ywa
 + strict mode
 + brak nawiasów, brak œredników

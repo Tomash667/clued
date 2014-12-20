@@ -1,0 +1,4 @@
+print("Podaj a i b: ");
+int a = getint(), b = getint();
+print(a+" ^ "+b+" = "+pow(a,b));
+pause();

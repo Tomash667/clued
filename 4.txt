@@ -1,0 +1,7 @@
+printf("Podaj a, b: ");
+int a = getint();
+a = -a;
+int b = -getint();
+int c = -7;
+print("a: "+a+"\nb: "+b+"\nc: "+c);
+pause();

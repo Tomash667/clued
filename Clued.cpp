@@ -18,6 +18,31 @@ enum Op : byte
 	RET
 };
 
+int GetPriority(int op)
+{
+	if(op == MUL || op == DIV)
+		return 2;
+	else
+		return 1;
+}
+
+char OpChar(int op)
+{
+	switch(op)
+	{
+	case ADD:
+		return '+';
+	case SUB:
+		return '-';
+	case MUL:
+		return '*';
+	case DIV:
+		return '/';
+	default:
+		return '?';
+	}
+}
+
 enum VAR
 {
 	V_VOID,
@@ -49,6 +74,29 @@ bool CanCast(VAR to, VAR from)
 		return from == V_CSTR || from == V_INT;
 	default:
 		return false;
+	}
+}
+
+VAR CanOp(VAR a, Op op, VAR b)
+{
+	switch(op)
+	{
+	case ADD:
+		if(a == V_INT && b == V_INT)
+			return V_INT;
+		else if((a == V_STR || a == V_CSTR || a == V_INT) && (b == V_STR || b == V_CSTR || b == V_INT))
+			return V_STR;
+		else
+			return V_VOID;
+	case SUB:
+	case DIV:
+	case MUL:
+		if(a == V_INT && b == V_INT)
+			return V_INT;
+		else
+			return V_VOID;
+	default:
+		return V_VOID;
 	}
 }
 
@@ -197,25 +245,39 @@ void run(byte* code)
 				Var v = stack.back();
 				stack.pop_back();
 				Var& v2 = stack.back();
-				cstring s1, s2;
-				if(v.type == V_STR)
-					s1 = v.str->s.c_str();
-				else
-					s1 = v.cstr;
-				if(v2.type == V_STR)
-					s2 = v2.str->s.c_str();
-				else
-					s2 = v2.cstr;
-				cstring s = Format("%s%s", s1, s2);
-				if(v.type == V_STR)
-					v.str->Release();
-				if(v2.type == V_STR)
+				if(v.type == V_STR || v.type == V_CSTR || v2.type == V_STR || v2.type == V_CSTR)
 				{
-					if(v2.str->refs == 1)
-						v2.str->s = s;
+					cstring s1, s2;
+					if(v.type == V_STR)
+						s1 = v.str->s.c_str();
+					else if(v.type == V_CSTR)
+						s1 = v.cstr;
+					else
+						s1 = Format("%d", v.Int);
+					if(v2.type == V_STR)
+						s2 = v2.str->s.c_str();
+					else if(v2.type == V_CSTR)
+						s2 = v2.cstr;
+					else
+						s2 = Format("%d", v.Int);
+					cstring s = Format("%s%s", s2, s1);
+					if(v.type == V_STR)
+						v.str->Release();
+					if(v2.type == V_STR)
+					{
+						if(v2.str->refs == 1)
+							v2.str->s = s;
+						else
+						{
+							v2.str->Release();
+							v2.str = new String;
+							v2.str->refs = 1;
+							v2.str->s = s;
+						}
+					}
 					else
 					{
-						v2.str->Release();
+						v2.type = V_STR;
 						v2.str = new String;
 						v2.str->refs = 1;
 						v2.str->s = s;
@@ -223,11 +285,35 @@ void run(byte* code)
 				}
 				else
 				{
-					v2.type = V_STR;
-					v2.str = new String;
-					v2.str->refs = 1;
-					v2.str->s = s;
+					// adding ints
+					v2.Int += v.Int;
 				}
+			}
+			break;
+		case SUB:
+			{
+				Var v = stack.back();
+				stack.pop_back();
+				Var& v2 = stack.back();
+				v2.Int -= v.Int;
+			}
+			break;
+		case MUL:
+			{
+				Var v = stack.back();
+				stack.pop_back();
+				Var& v2 = stack.back();
+				v2.Int *= v.Int;
+			}
+			break;
+		case DIV:
+			{
+				Var v = stack.back();
+				stack.pop_back();
+				Var& v2 = stack.back();
+				if(v.Int == 0)
+					throw "Division by zero!";
+				v2.Int /= v.Int;
 			}
 			break;
 		case CALL:
@@ -370,11 +456,25 @@ Node* parse_expr(char funcend)
 			node->nodes.push_back(result);
 			return node;
 		}
-		else if(t.IsSymbol('+'))
+		else if(t.IsSymbol('+') || t.IsSymbol('-') || t.IsSymbol('*') || t.IsSymbol('/'))
 		{
 			Node* onode = new Node;
 			onode->op = Node::N_OP;
-			onode->id = ADD;
+			switch(t.GetSymbol())
+			{
+			case '+':
+				onode->id = ADD;
+				break;
+			case '-':
+				onode->id = SUB;
+				break;
+			case '*':
+				onode->id = MUL;
+				break;
+			case '/':
+				onode->id = DIV;
+				break;
+			}
 			node->nodes.push_back(onode);
 			t.Next();
 		}
@@ -398,14 +498,16 @@ Node* parse_expr(char funcend)
 		Node* n = *it;
 		if(n->op == Node::N_OP)
 		{
-			if(node_stack.empty())
-				node_stack.push_back(n);
-			else
+			if(!node_stack.empty())
 			{
-				node_out.push_back(node_stack.back());
-				node_stack.pop_back();
-				node_stack.push_back(n);
+				int prio = GetPriority(n->id);
+				while(!node_stack.empty() && prio <= GetPriority(node_stack.back()->id))
+				{
+					node_out.push_back(node_stack.back());
+					node_stack.pop_back();
+				}
 			}
+			node_stack.push_back(n);
 		}
 		else
 			node_out.push_back(n);
@@ -427,9 +529,12 @@ Node* parse_expr(char funcend)
 			node->nodes.pop_back();
 			Node* a = node->nodes.back();
 			node->nodes.pop_back();
-			n->nodes.push_back(b);
+			VAR result = CanOp(a->return_type, (Op)n->id, b->return_type);
+			if(result == V_VOID)
+				t.Throw(Format("Invalid operation %s %c %s.", var_name[a->return_type], OpChar(n->id), var_name[b->return_type]));
 			n->nodes.push_back(a);
-			n->return_type = V_STR;
+			n->nodes.push_back(b);
+			n->return_type = result;
 			node->nodes.push_back(n);
 		}
 		else
@@ -571,7 +676,7 @@ int main()
 {
 	try
 	{
-		parse("2.txt");
+		parse("3.txt");
 		run(&bcode[0]);
 	}
 	catch(cstring err)

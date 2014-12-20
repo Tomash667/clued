@@ -210,6 +210,14 @@
 				>
 			</File>
 			<File
+				RelativePath=".\4.txt"
+				>
+			</File>
+			<File
+				RelativePath=".\5.txt"
+				>
+			</File>
+			<File
 				RelativePath=".\todo.txt"
 				>
 			</File>

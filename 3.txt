@@ -2,7 +2,8 @@ int a = getint();
 int b = getint();
 int c = getint();
 int d = getint();
-print(a+b*c-d);
+int e = a+b*c-d;
+print("Wynik: "+e);
 pause();
 
 /*
