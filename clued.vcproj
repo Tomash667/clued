@@ -170,11 +170,27 @@
 				>
 			</File>
 			<File
+				RelativePath=".\Function.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\Parse.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\Run.cpp"
 				>
 			</File>
 			<File
+				RelativePath=".\Str.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\Tokenizer.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\Var.cpp"
 				>
 			</File>
 		</Filter>
@@ -188,7 +204,27 @@
 				>
 			</File>
 			<File
+				RelativePath=".\Function.h"
+				>
+			</File>
+			<File
+				RelativePath=".\Op.h"
+				>
+			</File>
+			<File
+				RelativePath=".\Parse.h"
+				>
+			</File>
+			<File
 				RelativePath=".\Pch.h"
+				>
+			</File>
+			<File
+				RelativePath=".\Run.h"
+				>
+			</File>
+			<File
+				RelativePath=".\Str.h"
 				>
 			</File>
 			<File

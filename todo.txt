@@ -7,8 +7,5 @@
 + wykrywanie nieu¿ywanych zmiennych
 + funkcje
 + wykrywanie nieu¿ywanych funkcji
-+ zwalnianie pamiêci
 + float
 + char
-
-int a = 3+7*4-8/2;
