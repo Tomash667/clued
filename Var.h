@@ -9,6 +9,7 @@ enum VAR
 {
 	V_VOID,
 	V_INT,
+	V_FLOAT,
 	V_STRING
 };
 
@@ -27,6 +28,12 @@ inline bool CanCast(VAR to, VAR from)
 	{
 	case V_VOID:
 	case V_INT:
+		if(from == V_FLOAT)
+			return true;
+		return false;
+	case V_FLOAT:
+		if(from == V_INT)
+			return true;
 		return false;
 	case V_STRING:
 		return from != V_VOID;
@@ -43,12 +50,14 @@ struct Var
 	{
 		Str* str;
 		int Int;
+		float Float;
 	};
 	VAR type;
 
 	Var() : type(V_VOID) {}
 	Var(Str* str) : str(str), type(V_STRING) {str->refs++;}
 	Var(int Int) : Int(Int), type(V_INT) {}
+	Var(float Float) : Float(Float), type(V_FLOAT) {}
 	Var(const Var& v)
 	{
 		type = v.type;

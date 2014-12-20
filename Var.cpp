@@ -6,5 +6,6 @@
 cstring var_name[] = {
 	"void",
 	"int",
+	"float",
 	"string"
 };

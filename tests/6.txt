@@ -1,4 +1,9 @@
 int a, b;
+print("int: ");
 a = b = getint();
 print(a+"/"+b);
+print("\nfloat: ");
+float c;
+b = c = getfloat();
+print("int: "+b+", float: "+c);
 pause();

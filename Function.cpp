@@ -9,6 +9,8 @@
 //=================================================================================================
 void f_print()
 {
+	if(stack.empty())
+		throw "Empty stack!";
 	Var& v = stack.back();
 	printf(v.str->s.c_str());
 	v.str->Release();
@@ -41,10 +43,20 @@ void f_getint()
 //=================================================================================================
 void f_pow()
 {
-	int a = stack.back().Int;
+	if(stack.size() < 2)
+		throw "Empty stack!";
+	float a = stack.back().Float;
 	stack.pop_back();
-	int b = stack.back().Int;
-	stack.back().Int = (int)pow((float)a, b);
+	float b = stack.back().Float;
+	stack.back().Float = pow(a, b);
+}
+
+//=================================================================================================
+void f_getfloat()
+{
+	float a;
+	std::cin >> a;
+	stack.push_back(Var(a));
 }
 
 //=================================================================================================
@@ -58,7 +70,8 @@ const Function funcs[] = {
 	"pause", V_VOID, ARGS0(), f_pause,
 	"getstr", V_STRING, ARGS0(), f_getstr,
 	"getint", V_INT, ARGS0(), f_getint,
-	"pow", V_INT, ARGS2(V_INT, V_INT), f_pow
+	"pow", V_INT, ARGS2(V_FLOAT, V_FLOAT), f_pow,
+	"getfloat", V_FLOAT, ARGS0(), f_getfloat
 };
 const int n_funcs = countof(funcs);
 
@@ -66,4 +79,12 @@ const int n_funcs = countof(funcs);
 void pause()
 {
 	_getch();
+}
+
+//=================================================================================================
+void call_func(int id)
+{
+	if(id >= n_funcs)
+		throw Format("Invalid function index %d.", id);
+	funcs[id].f();
 }

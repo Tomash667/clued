@@ -8,6 +8,7 @@ enum Op : byte
 	PUSH_VAR,
 	PUSH_CSTR,
 	PUSH_INT,
+	PUSH_FLOAT,
 	POP,
 	SET_VARS,
 	SET_VAR,
@@ -17,7 +18,7 @@ enum Op : byte
 	DIV,
 	NEG,
 	CALL,
-	TO_STRING,
+	CAST,
 	RET
 };
 

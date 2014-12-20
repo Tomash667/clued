@@ -7,5 +7,4 @@
 + wykrywanie nieu¿ywanych zmiennych
 + funkcje
 + wykrywanie nieu¿ywanych funkcji
-+ float
 + char

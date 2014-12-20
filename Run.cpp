@@ -19,19 +19,30 @@ void run(byte* code, vector<Str*>& strs)
 		switch(op)
 		{
 		case PUSH_CSTR:
-			stack.push_back(Var(strs[*c]));
-			++c;
+			{
+				byte b = *c;
+				if(b >= strs.size())
+					throw Format("Invalid cstr index %u.", b);
+				stack.push_back(Var(strs[b]));
+				++c;
+			}
 			break;
 		case PUSH_VAR:
-			stack.push_back(Var(vars[*c]));
-			++c;
+			{
+				byte b = *c;
+				if(b >= vars.size())
+					throw Format("Invalid var index %u.", b);
+				stack.push_back(Var(vars[b]));
+				++c;
+			}
 			break;
 		case PUSH_INT:
-			{
-				int a = *(int*)c;
-				c += 4;
-				stack.push_back(a);
-			}
+			stack.push_back(*(int*)c);
+			c += 4;
+			break;
+		case PUSH_FLOAT:
+			stack.push_back(*(float*)c);
+			c += 4;
 			break;
 		case POP:
 			if(stack.back().type == V_STRING)
@@ -44,7 +55,10 @@ void run(byte* code, vector<Str*>& strs)
 			break;
 		case SET_VAR:
 			{
-				Var& v = vars[*c];
+				byte b = *c;
+				if(b >= vars.size())
+					throw Format("Invalid var index %u.", b);
+				Var& v = vars[b];
 				++c;
 				if(v.type == V_STRING)
 					v.str->Release();
@@ -52,99 +66,180 @@ void run(byte* code, vector<Str*>& strs)
 			}
 			break;
 		case ADD:
+			if(stack.size() >= 2)
 			{
 				Var v = stack.back();
 				stack.pop_back();
 				Var& v2 = stack.back();
-				if(v.type == V_STRING || v2.type == V_STRING)
+				if(v.type == V_INT)
+					v2.Int += v.Int;
+				else if(v.type == V_FLOAT)
+					v2.Float += v.Float;
+				else if(v.type == V_STRING)
 				{
-					cstring s1, s2;
-					if(v.type == V_STRING)
-						s1 = v.str->s.c_str();
-					else
-						s1 = Format("%d", v.Int);
-					if(v2.type == V_STRING)
-						s2 = v2.str->s.c_str();
-					else
-						s2 = Format("%d", v2.Int);
-					cstring s = Format("%s%s", s2, s1);
-					if(v.type == V_STRING)
-						v.str->Release();
-					if(v2.type == V_STRING)
-					{
-						if(v2.str->refs == 1)
-							v2.str->s = s;
-						else
-						{
-							v2.str->Release();
-							v2.str = StrPool.Get();
-							v2.str->refs = 1;
-							v2.str->s = s;
-						}
-					}
-					else
-					{
-						v2.type = V_STRING;
-						v2.str = StrPool.Get();
-						v2.str->refs = 1;
+					cstring s = Format("%s%s", v2.str->s.c_str(), v.str->s.c_str());
+					v.str->Release();
+					if(v2.str->refs == 1)
 						v2.str->s = s;
+					else
+					{
+						v2.str->Release();
+						v2.str = StrPool.Get();
+						v2.str->s = s;
+						v2.str->refs = 1;
 					}
 				}
 				else
-				{
-					// adding ints
-					v2.Int += v.Int;
-				}
+					throw "Invalid operation!";
 			}
+			else
+				throw "Empty stack!";
 			break;
 		case SUB:
+			if(stack.size() >= 2)
 			{
 				Var v = stack.back();
 				stack.pop_back();
 				Var& v2 = stack.back();
-				v2.Int -= v.Int;
+				if(v.type == V_INT)
+					v2.Int -= v.Int;
+				else if(v.type == V_FLOAT)
+					v2.Float -= v.Float;
+				else
+					throw "Invalid operation!";
 			}
+			else
+				throw "Empty stack!";
 			break;
 		case MUL:
+			if(stack.size() >= 2)
 			{
 				Var v = stack.back();
 				stack.pop_back();
 				Var& v2 = stack.back();
-				v2.Int *= v.Int;
+				if(v.type == V_INT)
+					v2.Int *= v.Int;
+				else if(v.type == V_FLOAT)
+					v2.Float *= v.Float;
+				else
+					throw "Invalid operation!";
 			}
+			else
+				throw "Empty stack!";
 			break;
 		case DIV:
+			if(stack.size() >= 2)
 			{
 				Var v = stack.back();
 				stack.pop_back();
 				Var& v2 = stack.back();
-				if(v.Int == 0)
-					throw "Division by zero!";
-				v2.Int /= v.Int;
+				if(v.type == V_INT)
+				{
+					if(v.Int == 0)
+						throw "Division by zero!";
+					v2.Int /= v.Int;
+				}
+				else if(v.type == V_FLOAT)
+				{
+					if(v.Float == 0.f)
+						throw "Division by zero!";
+					v2.Float /= v.Float;
+				}
+				else
+					throw "Invalid operation!";
 			}
+			else
+				throw "Empty stack!";
 			break;
 		case NEG:
-			stack.back().Int = -stack.back().Int;
-			break;
-		case CALL:
-			funcs[*c].f();
-			++c;
-			break;
-		case TO_STRING:
+			if(!stack.empty())
 			{
 				Var& v = stack.back();
 				if(v.type == V_INT)
-				{
-					int Int = v.Int;
-					v.str = StrPool.Get();
-					v.str->s = Format("%d", Int);
-					v.str->refs = 1;
-					v.type = V_STRING;
-				}
+					v.Int = -v.Int;
+				else
+					v.Float = -v.Float;
 			}
+			else
+				throw "Empty stack!";
+			break;
+		case CALL:
+			call_func(*c);
+			++c;
+			break;
+		case CAST:
+			if(!stack.empty())
+			{
+				cstring s;
+				VAR type = (VAR)*c;
+				++c;
+				Var& v = stack.back();
+				bool invalid = false;
+				switch(v.type)
+				{
+				case V_VOID:
+					invalid = true;
+					break;
+				case V_INT:
+					switch(type)
+					{
+					case V_INT:
+						break;
+					case V_FLOAT:
+						v.Float = (float)v.Int;
+						v.type = V_FLOAT;
+						break;
+					case V_STRING:
+						s = Format("%d", v.Int);
+						v.str = StrPool.Get();
+						v.str->s = s;
+						v.str->refs = 1;
+						v.type = V_STRING;
+						break;
+					default:
+						invalid = true;
+						break;
+					}
+					break;
+				case V_FLOAT:
+					switch(type)
+					{
+					case V_INT:
+						v.Int = (int)v.Float;
+						v.type = V_INT;
+						break;
+					case V_FLOAT:
+						break;
+					case V_STRING:
+						s = Format("%g", v.Float);
+						v.str = StrPool.Get();
+						v.str->s = s;
+						v.str->refs = 1;
+						v.type = V_STRING;
+						break;
+					default:
+						invalid = true;
+						break;
+					}
+					break;
+				case V_STRING:
+					if(type != V_STRING)
+						invalid = true;
+					break;
+				default:
+					invalid = true;
+					break;
+				}
+				if(invalid)
+					throw Format("Invalid cast from %s to %s.", var_name[v.type], var_name[type]);
+			}
+			else
+				throw "Empty stack!";
 			break;
 		case RET:
 			return;
+		default:
+			throw Format("Unknown op code %d!", op);
 		}
 	}
 }
@@ -166,12 +261,12 @@ void try_run(byte* code, vector<Str*>& strs)
 
 	for(vector<Var>::iterator it = stack.begin(), end = stack.end(); it != end; ++it)
 	{
-		if(it->type == V_INT)
+		if(it->type == V_STRING)
 			it->str->Release();
 	}
 	for(vector<Var>::iterator it = vars.begin(), end = vars.end(); it != end; ++it)
 	{
-		if(it->type == V_INT)
+		if(it->type == V_STRING)
 			it->str->Release();
 	}
 
