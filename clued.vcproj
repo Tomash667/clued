@@ -277,6 +277,14 @@
 				RelativePath=".\tests\6.txt"
 				>
 			</File>
+			<File
+				RelativePath=".\tests\7.txt"
+				>
+			</File>
+			<File
+				RelativePath=".\tests\quadric_eq.txt"
+				>
+			</File>
 		</Filter>
 	</Files>
 	<Globals>

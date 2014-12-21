@@ -27,6 +27,7 @@ VAR CanOp(VAR a, Op op, VAR b)
 	case SUB:
 	case DIV:
 	case MUL:
+	case MOD:
 		if(a == b)
 		{
 			if(a == V_INT || a == V_FLOAT)
@@ -396,8 +397,10 @@ static void parse_exprl()
 static void parse_vard()
 {
 	// vard -> var_type name [= expr] [, name [= expr]] ... ;
+	//		   var_type name ( [args] ) ;
 	VAR type = (VAR)t.GetKeywordId();
 	t.Next();
+	bool first = true;
 
 	do
 	{
@@ -442,6 +445,12 @@ static void parse_vard()
 				node->nodes.push_back(result);
 			top_nodes.push_back(node);
 		}
+		else if(first && t.IsSymbol('('))
+		{
+			// it's a function
+		}
+
+		first = false;
 
 		// next variable
 		if(t.IsSymbol(','))

@@ -16,8 +16,10 @@ enum Op : byte
 	SUB,
 	MUL,
 	DIV,
+	MOD,
 	NEG,
 	CALL,
+	CALLF,
 	CAST,
 	RET
 };
@@ -26,7 +28,7 @@ enum Op : byte
 // return priority of arthmetic operators
 inline int GetPriority(int op)
 {
-	if(op == MUL || op == DIV)
+	if(op == MUL || op == DIV || op == MOD)
 		return 2;
 	else
 		return 1;
@@ -46,6 +48,8 @@ inline char OpChar(int op)
 		return '*';
 	case DIV:
 		return '/';
+	case MOD:
+		return '%';
 	default:
 		return '?';
 	}

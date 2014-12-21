@@ -8,3 +8,10 @@
 + funkcje
 + wykrywanie nieu¿ywanych funkcji
 + char
++ if z jednym expr pod
++ optymalizacja u¿ywania wartoœci ze stosu (np int x = getint(); if(x > 0) ...
++ optymalizacja litera³ów jako float jeœli potrzeba (np. float a = getfloat(); float = 2*a;) aktualnie to zrobi PUSH_INT, 2; CAST, FLOAT; PUSH_VAR, A; MUL
++ compound assignment
++ ++ --
++ for
++ u¿ywanie zmiennych z poza funkcji

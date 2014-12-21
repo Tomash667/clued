@@ -151,14 +151,40 @@ void run(byte* code, vector<Str*>& strs)
 			else
 				throw "Empty stack!";
 			break;
+		case MOD:
+			if(stack.size() >= 2)
+			{
+				Var v = stack.back();
+				stack.pop_back();
+				Var& v2 = stack.back();
+				if(v.type == V_INT)
+				{
+					if(v.Int == 0)
+						throw "Division by zero!";
+					v2.Int = v2.Int % v.Int;
+				}
+				else if(v.type == V_FLOAT)
+				{
+					if(v.Float == 0.f)
+						throw "Division by zero!";
+					v2.Float = v2.Float % v.Float;
+				}
+				else
+					throw "Invalid operation!";
+			}
+			else
+				throw "Empty stack!";
+			break;
 		case NEG:
 			if(!stack.empty())
 			{
 				Var& v = stack.back();
 				if(v.type == V_INT)
 					v.Int = -v.Int;
-				else
+				else if(v.type == V_FLOAT)
 					v.Float = -v.Float;
+				else
+					throw "Invalid operation!";
 			}
 			else
 				throw "Empty stack!";

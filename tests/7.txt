@@ -1,0 +1,15 @@
+print("before func\n");
+int aaa()
+{
+	print("inside func aaa\n");
+	return 42;
+}
+void bbb()
+{
+	print("inside func bbb\n");
+}
+print("after func\n");
+int a = aaa();
+bbb();
+print("after call, result: "+a);
+pause();
