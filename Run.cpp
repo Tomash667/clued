@@ -5,13 +5,27 @@
 #include "Function.h"
 
 //=================================================================================================
-vector<Var> stack;
-vector<Var> vars;
+struct Callstack
+{
+	byte* return_pos;
+	int function;
+	uint prev_func_vars;
+};
 
 //=================================================================================================
-void run(byte* code, vector<Str*>& strs)
+vector<Var> stack;
+vector<Var> vars;
+vector<Callstack> callstack;
+uint vars_offset, func_vars;
+ObjectPool<ScriptFunction> ScriptFunctionPool;
+
+//=================================================================================================
+void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 {
 	byte* c = code;
+	vars_offset = 0;
+	func_vars = 0;
+
 	while(1)
 	{
 		Op op = (Op)*c;
@@ -29,9 +43,9 @@ void run(byte* code, vector<Str*>& strs)
 			break;
 		case PUSH_VAR:
 			{
-				byte b = *c;
+				byte b = *c + vars_offset;
 				if(b >= vars.size())
-					throw Format("Invalid var index %u.", b);
+					throw Format("Invalid var index %u.", b-vars_offset);
 				stack.push_back(Var(vars[b]));
 				++c;
 			}
@@ -50,14 +64,15 @@ void run(byte* code, vector<Str*>& strs)
 			stack.pop_back();
 			break;
 		case SET_VARS:
-			vars.resize(*c);
+			func_vars = *c;
+			vars.resize(func_vars + vars_offset);
 			++c;
 			break;
 		case SET_VAR:
 			{
-				byte b = *c;
+				byte b = *c + vars_offset;
 				if(b >= vars.size())
-					throw Format("Invalid var index %u.", b);
+					throw Format("Invalid var index %u.", b + vars_offset);
 				Var& v = vars[b];
 				++c;
 				if(v.type == V_STRING)
@@ -167,7 +182,7 @@ void run(byte* code, vector<Str*>& strs)
 				{
 					if(v.Float == 0.f)
 						throw "Division by zero!";
-					v2.Float = v2.Float % v.Float;
+					v2.Float = fmod(v2.Float, v.Float);
 				}
 				else
 					throw "Invalid operation!";
@@ -192,6 +207,21 @@ void run(byte* code, vector<Str*>& strs)
 		case CALL:
 			call_func(*c);
 			++c;
+			break;
+		case CALLF:
+			{
+				byte b = *c;
+				++c;
+				if(b >= sfuncs.size())
+					throw Format("Invalid script function index %u.", b);
+				Callstack& cs = Add1(callstack);
+				cs.function = b;
+				cs.return_pos = c;
+				cs.prev_func_vars = func_vars;
+				c = code + sfuncs[b].pos;
+				vars_offset = vars.size();
+				func_vars = sfuncs[b].args;
+			}
 			break;
 		case CAST:
 			if(!stack.empty())
@@ -263,7 +293,38 @@ void run(byte* code, vector<Str*>& strs)
 				throw "Empty stack!";
 			break;
 		case RET:
-			return;
+			if(callstack.empty())
+				return;
+			else
+			{
+				Callstack& call = callstack.back();
+				ScriptFunction& f = sfuncs[call.function];
+				Var result;
+				if(f.have_result)
+				{
+					result = stack.back();
+					stack.pop_back();
+				}
+				for(int i = 0; i < f.args; ++i)
+				{
+					if(stack.back().type == V_STRING)
+						stack.back().str->Release();
+					stack.pop_back();
+				}
+				if(f.have_result)
+					stack.push_back(result);
+				for(uint i = 0; i < func_vars; ++i)
+				{
+					if(vars.back().type == V_STRING)
+						vars.back().str->Release();
+					vars.pop_back();
+				}
+				func_vars = call.prev_func_vars;
+				vars_offset -= func_vars;
+				c = call.return_pos;
+				callstack.pop_back();
+			}
+			break;
 		default:
 			throw Format("Unknown op code %d!", op);
 		}
@@ -271,11 +332,11 @@ void run(byte* code, vector<Str*>& strs)
 }
 
 //=================================================================================================
-void try_run(byte* code, vector<Str*>& strs)
+void try_run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 {
 	try
 	{
-		run(code, strs);
+		run(code, strs, sfuncs);
 		if(!stack.empty())
 			throw "Stack not empty!";
 	}

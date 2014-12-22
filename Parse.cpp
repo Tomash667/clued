@@ -4,6 +4,7 @@
 #include "Var.h"
 #include "Function.h"
 #include "Op.h"
+#include "ScriptFunction.h"
 
 //=================================================================================================
 VAR CanOp(VAR a, Op op, VAR b)
@@ -63,13 +64,15 @@ struct Node
 	enum NodeOp
 	{
 		N_CALL,
+		N_CALLF,
 		N_OP,
 		N_VAR,
 		N_SET,
 		N_INT,
 		N_FLOAT,
 		N_CSTR,
-		N_CAST
+		N_CAST,
+		N_RETURN
 	} op;
 	union
 	{
@@ -81,13 +84,64 @@ struct Node
 };
 
 //=================================================================================================
+struct ParseFunction
+{
+	string name;
+	VAR return_type;
+	vector<ParseVar> args, vars;
+	vector<Node*> nodes;
+	vector<VAR> arg_types;
+};
+
+//=================================================================================================
 static ObjectPool<Node> NodePool;
-static vector<ParseVar> vars;
-static vector<Node*> top_nodes;
+static ObjectPool<ParseFunction> FunctionPool;
 static vector<Node*> node_out, node_stack;
+static vector<ParseFunction*> functions;
+static ParseFunction* top_function;
 
 //=================================================================================================
 static Node* parse_expr(char funcend, char funcend2=0);
+static void parse_block(char funcend);
+
+//=================================================================================================
+static void parse_args(Node* fnode, const string& name, const vector<VAR>& args)
+{
+	// (
+	t.Next();
+	t.AssertSymbol('(');
+	t.Next();
+	// args
+	if(!args.empty())
+	{
+		int index = 1;
+		for(vector<VAR>::const_iterator it = args.begin(), end = args.end(); it != end; ++it, ++index)
+		{
+			VAR type = *it;
+			Node* result = parse_expr(it+1 != end ? ',' : ')');
+			if(!result)
+				t.Throw(Format("Empty statement as %d arg of function %s.", index, name.c_str()));
+			if(!CanCast(type, result->return_type))
+				t.Throw(Format("Can't cast from %s to %s for arg %d in function call %s.", var_name[result->return_type], var_name[type], index, name.c_str()));
+			if(type != result->return_type)
+			{
+				Node* cast = NodePool.Get();
+				cast->op = Node::N_CAST;
+				cast->return_type = type;
+				cast->nodes.push_back(result);
+				fnode->nodes.push_back(cast);
+			}
+			else
+				fnode->nodes.push_back(result);
+			t.Next();
+		}
+	}
+	else
+	{
+		t.AssertSymbol(')');
+		t.Next();
+	}
+}
 
 //=================================================================================================
 static Node* parse_statement()
@@ -105,63 +159,41 @@ static Node* parse_statement()
 		fnode->op = Node::N_CALL;
 		fnode->id = fid;
 		fnode->return_type = f.return_type;
-		// (
-		t.Next();
-		t.AssertSymbol('(');
-		t.Next();
-		// args
-		if(f.arg_count > 0)
-		{
-			for(int i=0; i<f.arg_count; ++i)
-			{
-				Node* result = parse_expr(i < f.arg_count-1 ? ',' : ')');
-				if(!result)
-					t.Throw(Format("Empty statement as %d arg of function %s.", i+1, f.name));
-				if(!CanCast(f.args[i], result->return_type))
-					t.Throw(Format("Can't cast from %s to %s for arg %d in function call %s.", var_name[result->return_type], var_name[f.args[i]], i+1, f.name));
-				if(f.args[i] != result->return_type)
-				{
-					Node* cast = NodePool.Get();
-					cast->op = Node::N_CAST;
-					cast->return_type = f.args[i];
-					cast->nodes.push_back(result);
-					fnode->nodes.push_back(cast);
-				}
-				else
-					fnode->nodes.push_back(result);
-				t.Next();
-			}
-		}
-		else
-		{
-			t.AssertSymbol(')');
-			t.Next();
-		}
+		parse_args(fnode, f.name, f.args);
 		return fnode;
 	}
 	else if(t.IsItem())
 	{
-		// var
+		// var or script function
 		const string& s = t.MustGetItem();
 		int index = 0;
-		bool ok = false;
-		for(vector<ParseVar>::iterator it = vars.begin(), end = vars.end(); it != end; ++it, ++index)
+		for(vector<ParseVar>::iterator it = top_function->vars.begin(), end = top_function->vars.end(); it != end; ++it, ++index)
 		{
 			if(s == it->name)
 			{
-				ok = true;
-				break;
+				ParseVar& v = top_function->vars[index];
+				Node* vnode = NodePool.Get();
+				vnode->op = Node::N_VAR;
+				vnode->id = index;
+				vnode->return_type = v.type;
+				t.Next();
+				return vnode;
 			}
 		}
-		if(!ok)
-			t.Unexpected();
-		ParseVar& v = vars[index];
-		Node* vnode = NodePool.Get();
-		vnode->op = Node::N_VAR;
-		vnode->id = index;
-		vnode->return_type = v.type;
-		t.Next();
-		return vnode;
+		index = 0;
+		for(vector<ParseFunction*>::iterator it = functions.begin(), end = functions.end(); it != end; ++it, ++index)
+		{
+			if(s == (*it)->name)
+			{
+				ParseFunction& f = **it;
+				Node* fnode = NodePool.Get();
+				fnode->op = Node::N_CALLF;
+				fnode->id = index - 1;
+				fnode->return_type = f.return_type;
+				parse_args(fnode, f.name, f.arg_types);
+				return fnode;
+			}
+		}
 	}
 	else if(t.IsString())
 	{
@@ -255,9 +287,9 @@ static Node* parse_expr(char funcend, char funcend2)
 			t.Next();
 			Node* result = parse_expr(funcend);
 			if(!result)
-				t.Throw(Format("Can't assign empty expression to var %s '%s'.", var_name[node->return_type], vars[node->id].name.c_str()));
+				t.Throw(Format("Can't assign empty expression to var %s '%s'.", var_name[node->return_type], top_function->vars[node->id].name.c_str()));
 			if(!CanCast(node->return_type, result->return_type))
-				t.Throw(Format("Can't cast from %s to %s for var assignment '%s'.", var_name[result->return_type], var_name[node->return_type], vars[node->id].name.c_str()));
+				t.Throw(Format("Can't cast from %s to %s for var assignment '%s'.", var_name[result->return_type], var_name[node->return_type], top_function->vars[node->id].name.c_str()));
 			if(result->return_type != node->return_type)
 			{
 				Node* cast = NodePool.Get();
@@ -270,7 +302,7 @@ static Node* parse_expr(char funcend, char funcend2)
 				node->nodes.push_back(result);
 			return node;
 		}
-		else if(t.IsSymbol('+') || t.IsSymbol('-') || t.IsSymbol('*') || t.IsSymbol('/'))
+		else if(t.IsSymbol('+') || t.IsSymbol('-') || t.IsSymbol('*') || t.IsSymbol('/') || t.IsSymbol('%'))
 		{
 			Node* onode = NodePool.Get();
 			onode->op = Node::N_OP;
@@ -287,6 +319,9 @@ static Node* parse_expr(char funcend, char funcend2)
 				break;
 			case '/':
 				onode->id = DIV;
+				break;
+			case '%':
+				onode->id = MOD;
 				break;
 			}
 			node->nodes.push_back(onode);
@@ -390,7 +425,7 @@ static void parse_exprl()
 	// exprl -> expr ;
 	Node* result = parse_expr(';');
 	t.AssertSymbol(';');
-	top_nodes.push_back(result);
+	top_function->nodes.push_back(result);
 }
 
 //=================================================================================================
@@ -407,47 +442,124 @@ static void parse_vard()
 		const string& s = t.MustGetItem();
 
 		// check is unique
-		for(vector<ParseVar>::iterator it = vars.begin(), end = vars.end(); it != end; ++it)
+		for(vector<ParseFunction*>::iterator it = functions.begin(), end = functions.end(); it != end; ++it)
+		{
+			if((*it)->name == s)
+				t.Throw(Format("Can't use '%s' as variable name, function with same name exists.", s.c_str()));
+		}
+		for(vector<ParseVar>::iterator it = top_function->vars.begin(), end = top_function->vars.end(); it != end; ++it)
 		{
 			if(it->name == s)
 				t.Throw(Format("Variable '%s' already declared at line %d with type '%s'.", s.c_str(), it->line, var_name[it->type]));
 		}
-		int vi = vars.size();
-		ParseVar& v = Add1(vars);
+		for(vector<ParseVar>::iterator it = top_function->vars.begin(), end = top_function->vars.end(); it != end; ++it)
+		{
+			if(it->name == s)
+				t.Throw(Format("Can't use '%s' as variable name, argument with same name exists.", s.c_str()));
+		}
+
+		int vi = top_function->vars.size();
+		ParseVar& v = Add1(top_function->vars);
 		v.name = s;
 		v.type = type;
 		v.line = t.GetLine();
 
 		t.Next();
 
-		// assingment
-		if(t.IsSymbol('='))
-		{
-			t.Next();
-			Node* result = parse_expr(';', ',');
-			if(!result)
-				t.Throw(Format("Empty assign expression for var %s '%s'.", var_name[v.type], v.name.c_str()));
-			if(!CanCast(type, result->return_type))
-				t.Throw(Format("Can't assign to var %s '%s' value of type '%s'.", var_name[v.type], v.name.c_str(), var_name[result->return_type]));
-			Node* node = NodePool.Get();
-			node->op = Node::N_SET;
-			node->id = vi;
-			node->return_type = v.type;
-			if(type != result->return_type)
-			{
-				Node* cast = NodePool.Get();
-				cast->op = Node::N_CAST;
-				cast->return_type = type;
-				cast->nodes.push_back(result);
-				node->nodes.push_back(cast);
-			}
-			else
-				node->nodes.push_back(result);
-			top_nodes.push_back(node);
-		}
-		else if(first && t.IsSymbol('('))
+		if(first && t.IsSymbol('('))
 		{
 			// it's a function
+			t.Next();
+			ParseFunction* f = FunctionPool.Get();
+			f->name = top_function->vars.back().name;
+			f->return_type = top_function->vars.back().type;
+			top_function->vars.pop_back();
+			
+			// args
+			while(true)
+			{
+				if(t.IsKeywordGroup(2))
+				{
+					// type
+					VAR var_type = (VAR)t.GetKeywordId();
+					if(var_type == V_VOID)
+						throw Format("Can't use void type as argument for funcion '%s'.", f->name.c_str());
+					t.Next();
+					// name
+					const string& s = t.MustGetItem();
+					for(vector<ParseFunction*>::iterator it = functions.begin(), end = functions.end(); it != end; ++it)
+					{
+						if((*it)->name == s)
+							t.Throw(Format("Can't use '%s' as argument name, function with same name exists.", s.c_str()));
+					}
+					for(vector<ParseVar>::iterator it = top_function->vars.begin(), end = top_function->vars.end(); it != end; ++it)
+					{
+						if(it->name == s)
+							t.Throw(Format("Argument name '%s' is already used with type %s.", s.c_str(), var_name[it->type]));
+					}
+					ParseVar& arg = Add1(f->args);
+					arg.name = s;
+					arg.type = var_type;
+					arg.line = 0;
+					f->arg_types.push_back(arg.type);
+					t.Next();
+					// , or )
+					if(t.IsSymbol(','))
+						t.Next();
+				}
+				else if(t.IsSymbol(')'))
+				{
+					t.Next();
+					break;
+				}
+				else
+					t.Unexpected(2, Tokenizer::T_SPECIFIC_KEYWORD_GROUP, 2, Tokenizer::T_SPECIFIC_SYMBOL, ')');
+			}
+
+			// {
+			t.AssertSymbol('{');
+
+			// function code block
+			ParseFunction* prev_f = top_function;
+			top_function = f;
+			parse_block('}');
+			functions.push_back(f);
+			top_function = prev_f;			
+
+			// }
+			t.AssertSymbol('}');
+			return;
+		}
+		else
+		{
+			// it's a variable
+			if(v.type == V_VOID)
+				throw Format("Can't use void type variable '%s'.", v.name.c_str());
+			if(t.IsSymbol('='))
+			{
+				// variable assignment
+				t.Next();
+				Node* result = parse_expr(';', ',');
+				if(!result)
+					t.Throw(Format("Empty assign expression for var %s '%s'.", var_name[v.type], v.name.c_str()));
+				if(!CanCast(type, result->return_type))
+					t.Throw(Format("Can't assign to var %s '%s' value of type '%s'.", var_name[v.type], v.name.c_str(), var_name[result->return_type]));
+				Node* node = NodePool.Get();
+				node->op = Node::N_SET;
+				node->id = vi;
+				node->return_type = v.type;
+				if(type != result->return_type)
+				{
+					Node* cast = NodePool.Get();
+					cast->op = Node::N_CAST;
+					cast->return_type = type;
+					cast->nodes.push_back(result);
+					node->nodes.push_back(cast);
+				}
+				else
+					node->nodes.push_back(result);
+				top_function->nodes.push_back(node);
+			}
 		}
 
 		first = false;
@@ -461,6 +573,58 @@ static void parse_vard()
 	while(1);
 
 	t.AssertSymbol(';');
+}
+
+//=================================================================================================
+static void parse_return()
+{
+	t.Next();
+	Node* result = parse_expr(';');
+	t.AssertSymbol(';');
+	bool invalid_type = false;
+	if(result)
+	{
+		if(top_function->return_type != result->return_type)
+			invalid_type = true;
+	}
+	else
+	{
+		if(top_function->return_type != V_VOID)
+			invalid_type = true;
+	}
+	if(invalid_type)
+		throw Format("Function '%s' must return value of type %s.", top_function->name.c_str(), var_name[top_function->return_type]);
+	Node* node = NodePool.Get();
+	node->op = Node::N_RETURN;
+	node->nodes.push_back(result);
+	node->return_type = top_function->return_type;
+	top_function->nodes.push_back(node);
+}
+
+//=================================================================================================
+static void parse_block(char funcend)
+{
+	while(true)
+	{
+		t.Next();
+		if(funcend)
+		{
+			if(t.IsSymbol(funcend))
+				break;
+		}
+		else
+		{
+			if(t.IsEof())
+				break;
+		}
+
+		if(t.IsKeywordGroup(0))
+			parse_return();
+		else if(t.IsKeywordGroup(2))
+			parse_vard();
+		else
+			parse_exprl();
+	}
 }
 
 //=================================================================================================
@@ -482,6 +646,10 @@ static void parse_node(Node* node, bool top)
 	{
 	case Node::N_CALL:
 		code->push_back(CALL);
+		code->push_back(node->id);
+		break;
+	case Node::N_CALLF:
+		code->push_back(CALLF);
 		code->push_back(node->id);
 		break;
 	case Node::N_CSTR:
@@ -513,6 +681,9 @@ static void parse_node(Node* node, bool top)
 		code->push_back(CAST);
 		code->push_back(node->return_type);
 		break;
+	case Node::N_RETURN:
+		code->push_back(RET);
+		break;
 	default:
 		assert(0);
 		break;
@@ -540,8 +711,10 @@ bool parse(cstring file, ParseOutput& out)
 	code = &out.code;
 	
 	// setup tokenizer
+	t.AddKeyword("return", 0);
 	for(int i=0; i<n_funcs; ++i)
 		t.AddKeyword(funcs[i].name, i, 1);
+	t.AddKeyword("void", V_VOID, 2);
 	t.AddKeyword("int", V_INT, 2);
 	t.AddKeyword("float", V_FLOAT, 2);
 	t.AddKeyword("string", V_STRING, 2);
@@ -551,20 +724,17 @@ bool parse(cstring file, ParseOutput& out)
 		return false;
 	}
 
+	// init main function
+	ParseFunction* f = FunctionPool.Get();
+	f->return_type = V_VOID;
+	f->name = "";
+	functions.push_back(f);
+	top_function = f;
+
 	// parse...
 	try
 	{
-		while(true)
-		{
-			t.Next();
-			if(t.IsEof())
-				break;
-
-			if(t.IsKeywordGroup(2))
-				parse_vard();
-			else
-				parse_exprl();
-		}
+		parse_block(0);
 	}
 	catch(cstring err)
 	{
@@ -574,17 +744,30 @@ bool parse(cstring file, ParseOutput& out)
 	}
 
 	// create byte code from expression tree and cleanup
-	if(vars.size() > 0)
+	for(vector<ParseFunction*>::iterator it = functions.begin(), end = functions.end(); it != end; ++it)
 	{
-		code->push_back(SET_VARS);
-		code->push_back(vars.size());
+		ParseFunction& f = **it;
+		top_function = &f;
+		if(it != functions.begin())
+		{
+			ScriptFunction& sf = Add1(out.funcs);
+			sf.have_result = (f.return_type != V_VOID);
+			sf.args = f.args.size();
+			sf.pos = code->size();
+		}
+		if(!f.vars.empty())
+		{
+			code->push_back(SET_VARS);
+			code->push_back(f.vars.size());
+		}
+		for(vector<Node*>::iterator it = f.nodes.begin(), end = f.nodes.end(); it != end; ++it)
+		{
+			parse_node(*it, true);
+			free_node(*it);
+		}
+		if(code->back() != RET)
+			code->push_back(RET);
 	}
-	for(vector<Node*>::iterator it = top_nodes.begin(), end = top_nodes.end(); it != end; ++it)
-	{
-		parse_node(*it, true);
-		free_node(*it);
-	}
-	code->push_back(RET);
 
 	return true;
 }

@@ -5,7 +5,6 @@
 + optymalizacja: obliczanie sta³ych
 + optymalizacja: string pooling
 + wykrywanie nieu¿ywanych zmiennych
-+ funkcje
 + wykrywanie nieu¿ywanych funkcji
 + char
 + if z jednym expr pod
@@ -15,3 +14,7 @@
 + ++ --
 + for
 + u¿ywanie zmiennych z poza funkcji
++ mo¿lwioœæ u¿ywania funkcji które s¹ przed ich wywo³aniem
++ wykrywanie kodu po return
++ wykrywanie braku zwracanej wartoœci w return
++ niektóre Node leakuja gdy sie cos wysypie

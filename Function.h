@@ -8,17 +8,12 @@
 typedef void (*VoidF)();
 
 //-------------------------------------------------------------------------------------------------
-// max arguments function can have
-#define MAX_ARGS 2
-
-//-------------------------------------------------------------------------------------------------
 // function type
 struct Function
 {
 	cstring name;
 	VAR return_type;
-	int arg_count;
-	VAR args[MAX_ARGS];
+	vector<VAR> args;
 	VoidF f;
 };
 

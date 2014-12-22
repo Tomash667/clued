@@ -1,0 +1,10 @@
+int dodaj(int a, int b)
+{
+	print("Dodawanie.\n");
+	return a+b;
+}
+
+print("Dodaj a i b: ");
+int a = getint(), b = getint();
+print("Wynik: "+dodaj(a,b));
+pause();

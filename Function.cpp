@@ -60,18 +60,13 @@ void f_getfloat()
 }
 
 //=================================================================================================
-#define ARGS0() 0, {V_VOID, V_VOID}
-#define ARGS1(a1) 1, {a1, V_VOID}
-#define ARGS2(a1, a2) 2, {a1, a2}
-
-//=================================================================================================
 const Function funcs[] = {
-	"print", V_VOID, ARGS1(V_STRING), f_print,
-	"pause", V_VOID, ARGS0(), f_pause,
-	"getstr", V_STRING, ARGS0(), f_getstr,
-	"getint", V_INT, ARGS0(), f_getint,
-	"pow", V_INT, ARGS2(V_FLOAT, V_FLOAT), f_pow,
-	"getfloat", V_FLOAT, ARGS0(), f_getfloat
+	"print", V_VOID, { V_STRING }, f_print,
+	"pause", V_VOID, {}, f_pause,
+	"getstr", V_STRING, {}, f_getstr,
+	"getint", V_INT, {}, f_getint,
+	"pow", V_INT, { V_FLOAT, V_FLOAT }, f_pow,
+	"getfloat", V_FLOAT, {}, f_getfloat
 };
 const int n_funcs = countof(funcs);
 
