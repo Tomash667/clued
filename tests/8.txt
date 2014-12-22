@@ -1,6 +1,6 @@
 int dodaj(int a, int b)
 {
-	print("Dodawanie.\n");
+	print("a: "+a+" b: "+b+"\n");
 	return a+b;
 }
 

@@ -67,6 +67,7 @@ struct Node
 		N_CALLF,
 		N_OP,
 		N_VAR,
+		N_ARG,
 		N_SET,
 		N_INT,
 		N_FLOAT,
@@ -192,6 +193,20 @@ static Node* parse_statement()
 				fnode->return_type = f.return_type;
 				parse_args(fnode, f.name, f.arg_types);
 				return fnode;
+			}
+		}
+		index = 0;
+		for(vector<ParseVar>::iterator it = top_function->args.begin(), end = top_function->args.end(); it != end; ++it, ++index)
+		{
+			if(s == it->name)
+			{
+				ParseVar& v = top_function->args[index];
+				Node* vnode = NodePool.Get();
+				vnode->op = Node::N_ARG;
+				vnode->id = index;
+				vnode->return_type = v.type;
+				t.Next();
+				return vnode;
 			}
 		}
 	}
@@ -474,6 +489,7 @@ static void parse_vard()
 			f->name = top_function->vars.back().name;
 			f->return_type = top_function->vars.back().type;
 			top_function->vars.pop_back();
+			functions.push_back(f);
 			
 			// args
 			while(true)
@@ -523,7 +539,7 @@ static void parse_vard()
 			ParseFunction* prev_f = top_function;
 			top_function = f;
 			parse_block('}');
-			functions.push_back(f);
+			
 			top_function = prev_f;			
 
 			// }
@@ -661,6 +677,10 @@ static void parse_node(Node* node, bool top)
 		break;
 	case Node::N_VAR:
 		code->push_back(PUSH_VAR);
+		code->push_back(node->id);
+		break;
+	case Node::N_ARG:
+		code->push_back(PUSH_ARG);
 		code->push_back(node->id);
 		break;
 	case Node::N_SET:

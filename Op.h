@@ -6,6 +6,7 @@
 enum Op : byte
 {
 	PUSH_VAR,
+	PUSH_ARG,
 	PUSH_CSTR,
 	PUSH_INT,
 	PUSH_FLOAT,

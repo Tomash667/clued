@@ -9,7 +9,7 @@ struct Callstack
 {
 	byte* return_pos;
 	int function;
-	uint prev_func_vars;
+	uint prev_func_vars, args_offset;
 };
 
 //=================================================================================================
@@ -32,21 +32,29 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 		++c;
 		switch(op)
 		{
-		case PUSH_CSTR:
-			{
-				byte b = *c;
-				if(b >= strs.size())
-					throw Format("Invalid cstr index %u.", b);
-				stack.push_back(Var(strs[b]));
-				++c;
-			}
-			break;
 		case PUSH_VAR:
 			{
 				byte b = *c + vars_offset;
 				if(b >= vars.size())
 					throw Format("Invalid var index %u.", b-vars_offset);
 				stack.push_back(Var(vars[b]));
+				++c;
+			}
+			break;
+		case PUSH_ARG:
+			{
+				byte b = *c;
+				if(callstack.empty() || b >= sfuncs[callstack.back().function].args)
+					throw Format("Invalid arg index %u.", b);
+				stack.push_back(Var(*(stack.begin() + callstack.back().args_offset - b)));
+			}
+			break;
+		case PUSH_CSTR:
+			{
+				byte b = *c;
+				if(b >= strs.size())
+					throw Format("Invalid cstr index %u.", b);
+				stack.push_back(Var(strs[b]));
 				++c;
 			}
 			break;
@@ -218,6 +226,7 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 				cs.function = b;
 				cs.return_pos = c;
 				cs.prev_func_vars = func_vars;
+				cs.args_offset = stack.size();
 				c = code + sfuncs[b].pos;
 				vars_offset = vars.size();
 				func_vars = sfuncs[b].args;
