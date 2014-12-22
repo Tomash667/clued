@@ -1,0 +1,15 @@
+print("Podaj a: ");
+float a = getint();
+if(a > 0)
+{
+	print("a wieksze od zera.");
+}
+else if(a == 0)
+{
+	print("a rowne zero");
+}
+else
+{
+	print("a mniejsze od zera");
+}
+pause();

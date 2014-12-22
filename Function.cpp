@@ -5,6 +5,7 @@
 #include <conio.h>
 #include <iostream>
 #include <cmath>
+#include <cstdarg>
 
 //=================================================================================================
 void f_print()
@@ -60,13 +61,29 @@ void f_getfloat()
 }
 
 //=================================================================================================
+Function::Function(cstring name, VAR return_type, VoidF f, ...) : name(name), return_type(return_type), f(f)
+{
+	va_list a;
+	va_start(a, f);
+	while(true)
+	{
+		VAR type = va_arg(a, VAR);
+		if(type == V_VOID)
+			break;
+		else
+			args.push_back(type);
+	}
+	va_end(a);
+}
+
+//=================================================================================================
 const Function funcs[] = {
-	"print", V_VOID, { V_STRING }, f_print,
-	"pause", V_VOID, {}, f_pause,
-	"getstr", V_STRING, {}, f_getstr,
-	"getint", V_INT, {}, f_getint,
-	"pow", V_INT, { V_FLOAT, V_FLOAT }, f_pow,
-	"getfloat", V_FLOAT, {}, f_getfloat
+	Function("print", V_VOID, f_print, V_STRING, V_VOID),
+	Function("pause", V_VOID, f_pause, V_VOID),
+	Function("getstr", V_STRING, f_getstr, V_VOID),
+	Function("getint", V_INT, f_getint, V_VOID),
+	Function("pow", V_FLOAT, f_pow, V_FLOAT, V_FLOAT, V_VOID),
+	Function("getfloat", V_FLOAT, f_getfloat, V_VOID)
 };
 const int n_funcs = countof(funcs);
 

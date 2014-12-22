@@ -224,6 +224,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\ScriptFunction.h"
+				>
+			</File>
+			<File
 				RelativePath=".\Str.h"
 				>
 			</File>
@@ -279,6 +283,14 @@
 			</File>
 			<File
 				RelativePath=".\tests\7.txt"
+				>
+			</File>
+			<File
+				RelativePath=".\tests\8.txt"
+				>
+			</File>
+			<File
+				RelativePath=".\tests\9.txt"
 				>
 			</File>
 			<File

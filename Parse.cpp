@@ -597,11 +597,13 @@ static void parse_return()
 	t.Next();
 	Node* result = parse_expr(';');
 	t.AssertSymbol(';');
-	bool invalid_type = false;
+	bool invalid_type = false, need_cast = false;
 	if(result)
 	{
-		if(top_function->return_type != result->return_type)
+		if(!CanCast(top_function->return_type, result->return_type))
 			invalid_type = true;
+		else if(top_function->return_type != result->return_type)
+			need_cast = true;
 	}
 	else
 	{
@@ -612,7 +614,16 @@ static void parse_return()
 		throw Format("Function '%s' must return value of type %s.", top_function->name.c_str(), var_name[top_function->return_type]);
 	Node* node = NodePool.Get();
 	node->op = Node::N_RETURN;
-	node->nodes.push_back(result);
+	if(need_cast)
+	{
+		Node* cast = NodePool.Get();
+		cast->op = Node::N_CAST;
+		cast->return_type = top_function->return_type;
+		cast->nodes.push_back(result);
+		node->nodes.push_back(cast);
+	}
+	else
+		node->nodes.push_back(result);
 	node->return_type = top_function->return_type;
 	top_function->nodes.push_back(node);
 }

@@ -15,6 +15,8 @@ struct Function
 	VAR return_type;
 	vector<VAR> args;
 	VoidF f;
+
+	Function(cstring name, VAR return_type, VoidF f, ...);
 };
 
 //-------------------------------------------------------------------------------------------------

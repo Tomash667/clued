@@ -3,6 +3,7 @@
 #include "Run.h"
 #include "Op.h"
 #include "Function.h"
+#include <cmath>
 
 //=================================================================================================
 struct Callstack
@@ -46,7 +47,10 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 				byte b = *c;
 				if(callstack.empty() || b >= sfuncs[callstack.back().function].args)
 					throw Format("Invalid arg index %u.", b);
-				stack.push_back(Var(*(stack.begin() + callstack.back().args_offset - b)));
+				Callstack& cs = callstack.back();
+				uint offset = cs.args_offset - sfuncs[cs.function].args + b;
+				stack.push_back(Var(stack[offset]));
+				++c;
 			}
 			break;
 		case PUSH_CSTR:
