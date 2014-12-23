@@ -22,7 +22,15 @@ enum Op : byte
 	CALL,
 	CALLF,
 	CAST,
-	RET
+	RET,
+	CMP,
+	JMP,
+	JE,
+	JNE,
+	JG,
+	JGE,
+	JL,
+	JLE
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -31,27 +39,41 @@ inline int GetPriority(int op)
 {
 	if(op == MUL || op == DIV || op == MOD)
 		return 2;
-	else
+	else if(op == ADD || op == SUB)
 		return 1;
+	else
+		return 0;
 }
 
 //-------------------------------------------------------------------------------------------------
 // return character representing operation, used for debug output
-inline char OpChar(int op)
+inline cstring OpChar(int op)
 {
 	switch(op)
 	{
 	case ADD:
-		return '+';
+		return "+";
 	case SUB:
-		return '-';
+		return "-";
 	case MUL:
-		return '*';
+		return "*";
 	case DIV:
-		return '/';
+		return "/";
 	case MOD:
-		return '%';
+		return "%";
+	case JE:
+		return "==";
+	case JNE:
+		return "!=";
+	case JG:
+		return ">";
+	case JGE:
+		return ">=";
+	case JL:
+		return "<";
+	case JLE:
+		return "<=";
 	default:
-		return '?';
+		return "?";
 	}
 }

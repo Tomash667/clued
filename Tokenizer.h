@@ -107,6 +107,7 @@ struct Tokenizer
 	inline bool IsFloat() const { return IsToken(T_FLOAT); }
 	inline bool IsNumber() const { return IsToken(T_INT) || IsToken(T_FLOAT); }
 	inline bool IsKeyword() const { return IsToken(T_KEYWORD); }
+	inline bool IsKeyword(int id) const { return IsToken(T_KEYWORD) && GetKeywordId() == id; }
 	inline bool IsKeywordGroup(int group) const { return IsKeyword() && GetKeywordGroup() == group; }
 
 	inline cstring GetTokenName(TOKEN_TYPE _tt) const

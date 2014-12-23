@@ -7,7 +7,7 @@
 int main()
 {
 	ParseOutput out;
-	if(parse("tests/8.txt", out))
+	if(parse("tests/9.txt", out))
 		try_run(&out.code[0], out.strs, out.funcs);
 
 	return 0;

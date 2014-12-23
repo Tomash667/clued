@@ -7,14 +7,22 @@
 #include "ScriptFunction.h"
 
 //=================================================================================================
-VAR CanOp(VAR a, Op op, VAR b)
+enum Keyword
+{
+	K_RETURN,
+	K_IF,
+	K_ELSE
+};
+
+//=================================================================================================
+VAR CanOp(VAR a, Op op, VAR b, bool& return_bool)
 {
 	switch(op)
 	{
 	case ADD:
 		if(a == b)
 		{
-			if(a != V_VOID)
+			if(a != V_VOID && a != V_BOOL)
 				return a;
 			else
 				return V_VOID;
@@ -29,6 +37,31 @@ VAR CanOp(VAR a, Op op, VAR b)
 	case DIV:
 	case MUL:
 	case MOD:
+		if(a == b)
+		{
+			if(a == V_INT || a == V_FLOAT)
+				return a;
+			else
+				return V_VOID;
+		}
+		else if((a == V_FLOAT || b == V_FLOAT) && (a == V_INT || b == V_INT))
+			return V_FLOAT;
+		else
+			return V_VOID;
+	case JE:
+	case JNE:
+		return_bool = true;
+		if(a == b)
+			return a;
+		else if((a == V_FLOAT || b == V_FLOAT) && (a == V_INT || b == V_INT))
+			return V_FLOAT;
+		else
+			return V_VOID;
+	case JG:
+	case JGE:
+	case JL:
+	case JLE:
+		return_bool = true;
 		if(a == b)
 		{
 			if(a == V_INT || a == V_FLOAT)
@@ -73,7 +106,9 @@ struct Node
 		N_FLOAT,
 		N_CSTR,
 		N_CAST,
-		N_RETURN
+		N_RETURN,
+		N_IF,
+		N_BLOCK
 	} op;
 	union
 	{
@@ -103,7 +138,7 @@ static ParseFunction* top_function;
 
 //=================================================================================================
 static Node* parse_expr(char funcend, char funcend2=0);
-static void parse_block(char funcend);
+static void parse_block(vector<Node*>& cont, char funcend);
 
 //=================================================================================================
 static void parse_args(Node* fnode, const string& name, const vector<VAR>& args)
@@ -287,63 +322,145 @@ static Node* parse_expr(char funcend, char funcend2)
 		Node* result = parse_statement();
 		node->nodes.push_back(result);
 
+		if(!t.IsSymbol())
+			t.Unexpected();
+
 		if(t.IsSymbol(funcend) || t.IsSymbol(funcend2))
 			break;
-		else if(t.IsSymbol('='))
+
+		switch(t.GetSymbol())
 		{
-			if(node->nodes.size() > 1 || node->nodes[0]->op != Node::N_VAR)
-				t.Throw("Can't assign becouse lvalue is not var.");
-			node->op = Node::N_SET;
-			node->id = node->nodes[0]->id;
-			node->return_type = node->nodes[0]->return_type;
-			node->nodes[0]->nodes.clear();
-			NodePool.Free(node->nodes[0]);
-			node->nodes.clear();
+		case '=':
 			t.Next();
-			Node* result = parse_expr(funcend);
-			if(!result)
-				t.Throw(Format("Can't assign empty expression to var %s '%s'.", var_name[node->return_type], top_function->vars[node->id].name.c_str()));
-			if(!CanCast(node->return_type, result->return_type))
-				t.Throw(Format("Can't cast from %s to %s for var assignment '%s'.", var_name[result->return_type], var_name[node->return_type], top_function->vars[node->id].name.c_str()));
-			if(result->return_type != node->return_type)
+			if(!t.IsSymbol('='))
 			{
-				Node* cast = NodePool.Get();
-				cast->op = Node::N_CAST;
-				cast->return_type = node->return_type;
-				cast->nodes.push_back(result);
-				node->nodes.push_back(cast);
+				// assingment
+				if(node->nodes.size() > 1 || node->nodes[0]->op != Node::N_VAR)
+					t.Throw("Can't assign becouse lvalue is not var.");
+				node->op = Node::N_SET;
+				node->id = node->nodes[0]->id;
+				node->return_type = node->nodes[0]->return_type;
+				node->nodes[0]->nodes.clear();
+				NodePool.Free(node->nodes[0]);
+				node->nodes.clear();
+				Node* result = parse_expr(funcend);
+				if(!result)
+					t.Throw(Format("Can't assign empty expression to var %s '%s'.", var_name[node->return_type], top_function->vars[node->id].name.c_str()));
+				if(!CanCast(node->return_type, result->return_type))
+					t.Throw(Format("Can't cast from %s to %s for var assignment '%s'.", var_name[result->return_type], var_name[node->return_type], top_function->vars[node->id].name.c_str()));
+				if(result->return_type != node->return_type)
+				{
+					Node* cast = NodePool.Get();
+					cast->op = Node::N_CAST;
+					cast->return_type = node->return_type;
+					cast->nodes.push_back(result);
+					node->nodes.push_back(cast);
+				}
+				else
+					node->nodes.push_back(result);
+				return node;
 			}
 			else
-				node->nodes.push_back(result);
-			return node;
-		}
-		else if(t.IsSymbol('+') || t.IsSymbol('-') || t.IsSymbol('*') || t.IsSymbol('/') || t.IsSymbol('%'))
-		{
-			Node* onode = NodePool.Get();
-			onode->op = Node::N_OP;
-			switch(t.GetSymbol())
 			{
-			case '+':
-				onode->id = ADD;
-				break;
-			case '-':
-				onode->id = SUB;
-				break;
-			case '*':
-				onode->id = MUL;
-				break;
-			case '/':
-				onode->id = DIV;
-				break;
-			case '%':
-				onode->id = MOD;
-				break;
+				// equals
+				t.Next();
+				Node* onode = NodePool.Get();
+				onode->op = Node::N_OP;
+				node->id = JE;
+				node->nodes.push_back(node);
 			}
-			node->nodes.push_back(onode);
+			break;
+		case '+':
+			{
+				Node* onode = NodePool.Get();
+				onode->op = Node::N_OP;
+				onode->id = ADD;
+				node->nodes.push_back(onode);
+				t.Next();
+			}
+			break;
+		case '-':
+			{
+				Node* onode = NodePool.Get();
+				onode->op = Node::N_OP;
+				onode->id = SUB;
+				node->nodes.push_back(onode);
+				t.Next();
+			}
+			break;
+		case '*':
+			{
+				Node* onode = NodePool.Get();
+				onode->op = Node::N_OP;
+				onode->id = MUL;
+				node->nodes.push_back(onode);
+				t.Next();
+			}
+			break;
+		case '/':
+			{
+				Node* onode = NodePool.Get();
+				onode->op = Node::N_OP;
+				onode->id = DIV;
+				node->nodes.push_back(onode);
+				t.Next();
+			}
+			break;
+		case '%':
+			{
+				Node* onode = NodePool.Get();
+				onode->op = Node::N_OP;
+				onode->id = MOD;
+				node->nodes.push_back(onode);
+				t.Next();
+			}
+			break;
+		case '!':
 			t.Next();
-		}
-		else
+			if(t.IsSymbol('='))
+			{
+				Node* onode = NodePool.Get();
+				onode->op = Node::N_OP;
+				onode->id = JNE;
+				node->nodes.push_back(onode);
+				t.Next();
+			}
+			else
+				t.Unexpected();
+		case '>':
+			{
+				t.Next();
+				Node* onode = NodePool.Get();
+				onode->op = Node::N_OP;
+				if(t.IsSymbol('='))
+				{
+					onode->id = JGE;
+					t.Next();
+				}
+				else
+					onode->id = JG;
+				node->nodes.push_back(onode);
+			}
+			break;
+		case '<':
+			{
+				t.Next();
+				Node* onode = NodePool.Get();
+				onode->op = Node::N_OP;
+				if(t.IsSymbol('='))
+				{
+					onode->id = JLE;
+					t.Next();
+				}
+				else
+					onode->id = JL;
+				node->nodes.push_back(onode);
+			}
+			break;
+		default:
 			t.Unexpected();
+			break;
+		}
 	}
 
 	// if 1 element then simply return it
@@ -394,7 +511,8 @@ static Node* parse_expr(char funcend, char funcend2)
 			node->nodes.pop_back();
 			Node* a = node->nodes.back();
 			node->nodes.pop_back();
-			VAR result = CanOp(a->return_type, (Op)n->id, b->return_type);
+			bool return_bool;
+			VAR result = CanOp(a->return_type, (Op)n->id, b->return_type, return_bool);
 			if(result == V_VOID)
 				t.Throw(Format("Invalid operation %s %c %s.", var_name[a->return_type], OpChar(n->id), var_name[b->return_type]));
 			if(a->return_type != result)
@@ -420,7 +538,7 @@ static Node* parse_expr(char funcend, char funcend2)
 				n->nodes.push_back(a);
 				n->nodes.push_back(b);
 			}
-			n->return_type = result;
+			n->return_type = return_bool ? V_BOOL : result;
 			node->nodes.push_back(n);
 		}
 		else
@@ -435,16 +553,18 @@ static Node* parse_expr(char funcend, char funcend2)
 }
 
 //=================================================================================================
-static void parse_exprl()
+static Node* parse_exprl()
 {
 	// exprl -> expr ;
+	//
 	Node* result = parse_expr(';');
 	t.AssertSymbol(';');
-	top_function->nodes.push_back(result);
+	t.Next();
+	return result;
 }
 
 //=================================================================================================
-static void parse_vard()
+static void parse_vard(vector<Node*>& cont)
 {
 	// vard -> var_type name [= expr] [, name [= expr]] ... ;
 	//		   var_type name ( [args] ) ;
@@ -538,12 +658,13 @@ static void parse_vard()
 			// function code block
 			ParseFunction* prev_f = top_function;
 			top_function = f;
-			parse_block('}');
+			parse_block(f->nodes, '}');
 			
 			top_function = prev_f;			
 
 			// }
 			t.AssertSymbol('}');
+			t.Next();
 			return;
 		}
 		else
@@ -574,7 +695,7 @@ static void parse_vard()
 				}
 				else
 					node->nodes.push_back(result);
-				top_function->nodes.push_back(node);
+				cont.push_back(node);
 			}
 		}
 
@@ -589,14 +710,16 @@ static void parse_vard()
 	while(1);
 
 	t.AssertSymbol(';');
+	t.Next();
 }
 
 //=================================================================================================
-static void parse_return()
+static Node* parse_return()
 {
 	t.Next();
 	Node* result = parse_expr(';');
 	t.AssertSymbol(';');
+	t.Next();
 	bool invalid_type = false, need_cast = false;
 	if(result)
 	{
@@ -625,15 +748,61 @@ static void parse_return()
 	else
 		node->nodes.push_back(result);
 	node->return_type = top_function->return_type;
-	top_function->nodes.push_back(node);
+	return node;
 }
 
 //=================================================================================================
-static void parse_block(char funcend)
+static Node* parse_if()
+{
+	// if
+	t.Next();
+	// (
+	t.AssertSymbol('(');
+	t.Next();
+	// expr
+	Node* result = parse_expr(')');
+	if(!result)
+		t.Throw("Empty if expression.");
+	if(result->return_type != V_BOOL)
+		t.Throw("If expression must return bool.");
+	t.AssertSymbol(')');
+	t.Next();
+	// create node
+	Node* node = NodePool.Get();
+	node->op = Node::N_IF;
+	node->return_type = V_VOID;
+	node->nodes.push_back(result);
+	// {
+	t.AssertSymbol('{');
+	t.Next();
+	// block
+	Node* block = NodePool.Get();
+	block->op = Node::N_BLOCK;
+	block->return_type = V_VOID;
+	parse_block(block->nodes, '}');
+	node->nodes.push_back(block);
+	// }
+	t.AssertSymbol('}');
+	t.Next();
+	// else
+	if(t.IsKeyword(K_ELSE))
+	{
+		t.Next();
+		// {
+		Node* else_block = NodePool.Get();
+		parse_block(else_block->nodes, '}');
+		node->nodes.push_back(else_block);
+		t.AssertSymbol('}');
+		t.Next();
+	}
+	return node;
+}
+
+//=================================================================================================
+static void parse_block(vector<Node*>& cont, char funcend)
 {
 	while(true)
 	{
-		t.Next();
 		if(funcend)
 		{
 			if(t.IsSymbol(funcend))
@@ -645,12 +814,22 @@ static void parse_block(char funcend)
 				break;
 		}
 
+		Node* node = NULL;
 		if(t.IsKeywordGroup(0))
-			parse_return();
+		{
+			Keyword k = (Keyword)t.GetKeywordId();
+			if(k == K_RETURN)
+				node = parse_return();
+			else
+				node = parse_if();
+		}
 		else if(t.IsKeywordGroup(2))
-			parse_vard();
+			parse_vard(cont);
 		else
-			parse_exprl();
+			node = parse_exprl();
+
+		if(node)
+			cont.push_back(node);
 	}
 }
 
@@ -742,7 +921,9 @@ bool parse(cstring file, ParseOutput& out)
 	code = &out.code;
 	
 	// setup tokenizer
-	t.AddKeyword("return", 0);
+	t.AddKeyword("return", K_RETURN);
+	t.AddKeyword("if", K_IF);
+	t.AddKeyword("else", K_ELSE);
 	for(int i=0; i<n_funcs; ++i)
 		t.AddKeyword(funcs[i].name, i, 1);
 	t.AddKeyword("void", V_VOID, 2);
@@ -765,7 +946,8 @@ bool parse(cstring file, ParseOutput& out)
 	// parse...
 	try
 	{
-		parse_block(0);
+		t.Next();
+		parse_block(f->nodes, 0);
 	}
 	catch(cstring err)
 	{

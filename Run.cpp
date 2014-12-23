@@ -19,6 +19,7 @@ vector<Var> vars;
 vector<Callstack> callstack;
 uint vars_offset, func_vars;
 ObjectPool<ScriptFunction> ScriptFunctionPool;
+int cmp_result;
 
 //=================================================================================================
 void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
@@ -336,6 +337,107 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 				vars_offset -= func_vars;
 				c = call.return_pos;
 				callstack.pop_back();
+			}
+			break;
+		case CMP:
+			if(stack.size() >= 2)
+			{
+				Var a = stack.back();
+				stack.pop_back();
+				Var& b = stack.back();
+				switch(a.type)
+				{
+				case V_INT:
+					if(a.Int > b.Int)
+						cmp_result = 1;
+					else if(a.Int == b.Int)
+						cmp_result = 0;
+					else
+						cmp_result = -1;
+					break;
+				case V_FLOAT:
+					if(a.Float > b.Float)
+						cmp_result = 1;
+					else if(a.Float == b.Float)
+						cmp_result = 0;
+					else
+						cmp_result = -1;
+					break;
+				case V_STRING:
+					if(a.str->s == b.str->s)
+						cmp_result = 0;
+					else
+						cmp_result = 1;
+					a.str->Release();
+					b.str->Release();
+					break;
+				default:
+					cmp_result = 1;
+					break;
+				}
+				stack.pop_back();
+			}
+			else
+				throw "Empty stack!";
+			break;
+		case JMP:
+			{
+				short dist = *(short*)c;
+				c += dist;
+			}
+			break;
+		case JE:
+			{
+				short dist = *(short*)c;
+				if(cmp_result == 0)
+					c += dist;
+				else
+					c += 2;
+			}
+			break;
+		case JNE:
+			{
+				short dist = *(short*)c;
+				if(cmp_result != 0)
+					c += dist;
+				else
+					c += 2;
+			}
+			break;
+		case JG:
+			{
+				short dist = *(short*)c;
+				if(cmp_result > 0)
+					c += dist;
+				else
+					c += 2;
+			}
+			break;
+		case JGE:
+			{
+				short dist = *(short*)c;
+				if(cmp_result >= 0)
+					c += dist;
+				else
+					c += 2;
+			}
+			break;
+		case JL:
+			{
+				short dist = *(short*)c;
+				if(cmp_result == 0)
+					c += dist;
+				else
+					c += 2;
+			}
+			break;
+		case JLE:
+			{
+				short dist = *(short*)c;
+				if(cmp_result == 0)
+					c += dist;
+				else
+					c += 2;
 			}
 			break;
 		default:

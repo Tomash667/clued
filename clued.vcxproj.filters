@@ -109,5 +109,8 @@
     <Text Include="tests\8.txt">
       <Filter>Tests</Filter>
     </Text>
+    <Text Include="tests\9.txt">
+      <Filter>Tests</Filter>
+    </Text>
   </ItemGroup>
 </Project>

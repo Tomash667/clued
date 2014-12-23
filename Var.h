@@ -8,6 +8,7 @@
 enum VAR
 {
 	V_VOID,
+	V_BOOL,
 	V_INT,
 	V_FLOAT,
 	V_STRING
@@ -48,16 +49,18 @@ struct Var
 {
 	union
 	{
-		Str* str;
+		bool Bool;
 		int Int;
 		float Float;
+		Str* str;
 	};
 	VAR type;
 
 	Var() : type(V_VOID) {}
-	Var(Str* str) : str(str), type(V_STRING) {str->refs++;}
+	Var(bool Bool) : Bool(Bool), type(V_BOOL) {}
 	Var(int Int) : Int(Int), type(V_INT) {}
 	Var(float Float) : Float(Float), type(V_FLOAT) {}
+	Var(Str* str) : str(str), type(V_STRING) { str->refs++; }
 	Var(const Var& v)
 	{
 		type = v.type;

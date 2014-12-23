@@ -18,3 +18,4 @@
 + wykrywanie kodu po return
 + wykrywanie braku zwracanej wartoœci w return
 + niektóre Node leakuja gdy sie cos wysypie
++ if(const)
