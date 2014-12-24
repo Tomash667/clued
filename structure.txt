@@ -1,0 +1,24 @@
+Script starts as one block that ends with EOF.
+
+Block of line statements
+block[END] -> [<line>/<vard> ...] END (block consist of zero or more line statements)
+
+Single statement or block
+line_block -> { <block> }
+			  <simple_line>
+
+Line statement
+line -> <vard>
+		<simple_line>
+
+Line statement (no functions or vars)
+line -> ;
+		return <statement> ;
+		if( <statement> ) <line_block> [else <line_block>]
+		<statement> ;
+
+Statement
+statement -> basic_statement [op basic_statement]
+
+vard -> var name [= value] [, name [= value] ...] ;
+		var name ( args ) { }

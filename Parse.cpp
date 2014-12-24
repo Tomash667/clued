@@ -108,7 +108,8 @@ struct Node
 		N_CAST,
 		N_RETURN,
 		N_IF,
-		N_BLOCK
+		N_BLOCK,
+		N_POP
 	} op;
 	union
 	{
@@ -136,9 +137,317 @@ static vector<Node*> node_out, node_stack;
 static vector<ParseFunction*> functions;
 static ParseFunction* top_function;
 
+inline Node* create_node(Node::NodeOp op)
+{
+	Node* node = NodePool.Get();
+	node->op = op;
+	return node;
+}
+
 //=================================================================================================
-static Node* parse_expr(char funcend, char funcend2=0);
-static void parse_block(vector<Node*>& cont, char funcend);
+//static Node* parse_expr(char funcend, char funcend2=0);
+static Node* parse_block(char endc);
+static Node* parse_if();
+static Node* parse_line_block();
+static Node* parse_line();
+static Node* parse_return();
+static Node* parse_statement(char endc);
+static Node* parse_vard();
+
+//=================================================================================================
+static Node* parse_block(char endc)
+{
+	Node* node = create_node(Node::N_BLOCK);
+
+	while(true)
+	{
+		if(endc)
+		{
+			if(t.IsSymbol(endc))
+				break;
+		}
+		else
+		{
+			if(t.IsEof())
+				break;
+		}
+
+		Node* result;
+		if(t.IsKeywordGroup(2))
+			result = parse_vard();
+		else
+			result = parse_line();
+		if(result)
+		{
+			node->nodes.push_back(result);
+			if(result->return_type != V_VOID)
+				node->nodes.push_back(create_node(Node::N_POP));
+		}
+	}
+
+	if(node->nodes.empty())
+	{
+		NodePool.Free(node);
+		return NULL;
+	}
+	else
+		return node;
+}
+
+//=================================================================================================
+static Node* parse_if()
+{
+	Node* node = NodePool.Get();
+	node->op = Node::N_IF;
+	// if
+	t.Next();
+	// (
+	t.AssertSymbol('(');
+	t.Next();
+	// expr
+	Node* result = parse_statement(')');
+	if(!result)
+		t.Throw("Empty if expression.");
+	if(result->return_type != V_BOOL)
+		t.Throw("If expression must return bool.");
+	t.AssertSymbol(')');
+	t.Next();
+	// create node
+	Node* node = NodePool.Get();
+	node->op = Node::N_IF;
+	node->return_type = V_VOID;
+	node->nodes.push_back(result);
+	// block, possibly added NULL Node
+	node->nodes.push_back(parse_line_block());
+	// else
+	if(t.IsKeyword(K_ELSE))
+	{
+		t.Next();
+		Node* else_block = parse_line_block();
+		if(else_block)
+			node->nodes.push_back(else_block);
+	}
+	return node;
+}
+
+//=================================================================================================
+static Node* parse_line_block()
+{
+	if(t.IsSymbol('{'))
+	{
+		t.Next();
+		Node* result = parse_block('}');
+		t.AssertSymbol('}');
+		t.Next();
+		return result;
+	}
+	else
+		return parse_line();
+}
+
+//=================================================================================================
+static Node* parse_line()
+{
+	if(t.IsSymbol(';'))
+		return NULL;
+	else if(t.IsKeywordGroup(0))
+	{
+		Keyword k = (Keyword)t.GetKeywordId();
+		if(k == K_IF)
+			return parse_if();
+		else if(k == K_RETURN)
+			return parse_return();
+		else
+			t.Unexpected();
+	}
+	else
+		return parse_statement(';');
+}
+
+//=================================================================================================
+static Node* parse_vard()
+{
+	// vard -> var_type name [= expr] [, name [= expr]] ... ;
+	//		   var_type name ( [args] ) ;
+	VAR type = (VAR)t.GetKeywordId();
+	t.Next();
+	bool first = true;
+	Node* cont = create_node(Node::N_BLOCK);
+	cont->return_type = V_VOID;
+
+	do
+	{
+		const string& s = t.MustGetItem();
+
+		// check is unique
+		for(vector<ParseFunction*>::iterator it = functions.begin(), end = functions.end(); it != end; ++it)
+		{
+			if((*it)->name == s)
+				t.Throw(Format("Can't use '%s' as variable name, function with same name exists.", s.c_str()));
+		}
+		for(vector<ParseVar>::iterator it = top_function->vars.begin(), end = top_function->vars.end(); it != end; ++it)
+		{
+			if(it->name == s)
+				t.Throw(Format("Variable '%s' already declared at line %d with type '%s'.", s.c_str(), it->line, var_name[it->type]));
+		}
+		for(vector<ParseVar>::iterator it = top_function->vars.begin(), end = top_function->vars.end(); it != end; ++it)
+		{
+			if(it->name == s)
+				t.Throw(Format("Can't use '%s' as variable name, argument with same name exists.", s.c_str()));
+		}
+
+		int vi = top_function->vars.size();
+		ParseVar& v = Add1(top_function->vars);
+		v.name = s;
+		v.type = type;
+		v.line = t.GetLine();
+
+		t.Next();
+
+		if(first && t.IsSymbol('('))
+		{
+			// it's a function
+			t.Next();
+			ParseFunction* f = FunctionPool.Get();
+			f->name = top_function->vars.back().name;
+			f->return_type = top_function->vars.back().type;
+			top_function->vars.pop_back();
+			functions.push_back(f);
+
+			// args
+			while(true)
+			{
+				if(t.IsKeywordGroup(2))
+				{
+					// type
+					VAR var_type = (VAR)t.GetKeywordId();
+					if(var_type == V_VOID)
+						throw Format("Can't use void type as argument for funcion '%s'.", f->name.c_str());
+					t.Next();
+					// name
+					const string& s = t.MustGetItem();
+					for(vector<ParseFunction*>::iterator it = functions.begin(), end = functions.end(); it != end; ++it)
+					{
+						if((*it)->name == s)
+							t.Throw(Format("Can't use '%s' as argument name, function with same name exists.", s.c_str()));
+					}
+					for(vector<ParseVar>::iterator it = top_function->vars.begin(), end = top_function->vars.end(); it != end; ++it)
+					{
+						if(it->name == s)
+							t.Throw(Format("Argument name '%s' is already used with type %s.", s.c_str(), var_name[it->type]));
+					}
+					ParseVar& arg = Add1(f->args);
+					arg.name = s;
+					arg.type = var_type;
+					arg.line = 0;
+					f->arg_types.push_back(arg.type);
+					t.Next();
+					// , or )
+					if(t.IsSymbol(','))
+						t.Next();
+				}
+				else if(t.IsSymbol(')'))
+				{
+					t.Next();
+					break;
+				}
+				else
+					t.Unexpected(2, Tokenizer::T_SPECIFIC_KEYWORD_GROUP, 2, Tokenizer::T_SPECIFIC_SYMBOL, ')');
+			}
+
+			// {
+			t.AssertSymbol('{');
+
+			// function code block
+			ParseFunction* prev_f = top_function;
+			top_function = f;
+			Node* result = parse_block('}');
+			f->nodes = result->nodes;
+			result->nodes.clear();
+			NodePool.Free(result);
+
+			top_function = prev_f;
+
+			// }
+			t.AssertSymbol('}');
+			t.Next();
+			NodePool.Free(cont);
+			return NULL;
+		}
+		else
+		{
+			// it's a variable
+			if(v.type == V_VOID)
+				throw Format("Can't use void type variable '%s'.", v.name.c_str());
+			if(t.IsSymbol('='))
+			{
+				// variable assignment
+				t.Next();
+				Node* result = parse_expr(';', ',');
+				if(!result)
+					t.Throw(Format("Empty assign expression for var %s '%s'.", var_name[v.type], v.name.c_str()));
+				if(!CanCast(type, result->return_type))
+					t.Throw(Format("Can't assign to var %s '%s' value of type '%s'.", var_name[v.type], v.name.c_str(), var_name[result->return_type]));
+				Node* node = NodePool.Get();
+				node->op = Node::N_SET;
+				node->id = vi;
+				node->return_type = v.type;
+				if(type != result->return_type)
+				{
+					Node* cast = NodePool.Get();
+					cast->op = Node::N_CAST;
+					cast->return_type = type;
+					cast->nodes.push_back(result);
+					node->nodes.push_back(cast);
+				}
+				else
+					node->nodes.push_back(result);
+				cont->nodes.push_back(node);
+				cont->nodes.push_back(create_node(Node::N_POP));
+			}
+		}
+
+		first = false;
+
+		// next variable
+		if(t.IsSymbol(','))
+			t.Next();
+		else
+			break;
+	} while(1);
+
+	t.AssertSymbol(';');
+	t.Next();
+	return cont;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 //=================================================================================================
 static void parse_args(Node* fnode, const string& name, const vector<VAR>& args)
@@ -564,156 +873,6 @@ static Node* parse_exprl()
 }
 
 //=================================================================================================
-static void parse_vard(vector<Node*>& cont)
-{
-	// vard -> var_type name [= expr] [, name [= expr]] ... ;
-	//		   var_type name ( [args] ) ;
-	VAR type = (VAR)t.GetKeywordId();
-	t.Next();
-	bool first = true;
-
-	do
-	{
-		const string& s = t.MustGetItem();
-
-		// check is unique
-		for(vector<ParseFunction*>::iterator it = functions.begin(), end = functions.end(); it != end; ++it)
-		{
-			if((*it)->name == s)
-				t.Throw(Format("Can't use '%s' as variable name, function with same name exists.", s.c_str()));
-		}
-		for(vector<ParseVar>::iterator it = top_function->vars.begin(), end = top_function->vars.end(); it != end; ++it)
-		{
-			if(it->name == s)
-				t.Throw(Format("Variable '%s' already declared at line %d with type '%s'.", s.c_str(), it->line, var_name[it->type]));
-		}
-		for(vector<ParseVar>::iterator it = top_function->vars.begin(), end = top_function->vars.end(); it != end; ++it)
-		{
-			if(it->name == s)
-				t.Throw(Format("Can't use '%s' as variable name, argument with same name exists.", s.c_str()));
-		}
-
-		int vi = top_function->vars.size();
-		ParseVar& v = Add1(top_function->vars);
-		v.name = s;
-		v.type = type;
-		v.line = t.GetLine();
-
-		t.Next();
-
-		if(first && t.IsSymbol('('))
-		{
-			// it's a function
-			t.Next();
-			ParseFunction* f = FunctionPool.Get();
-			f->name = top_function->vars.back().name;
-			f->return_type = top_function->vars.back().type;
-			top_function->vars.pop_back();
-			functions.push_back(f);
-			
-			// args
-			while(true)
-			{
-				if(t.IsKeywordGroup(2))
-				{
-					// type
-					VAR var_type = (VAR)t.GetKeywordId();
-					if(var_type == V_VOID)
-						throw Format("Can't use void type as argument for funcion '%s'.", f->name.c_str());
-					t.Next();
-					// name
-					const string& s = t.MustGetItem();
-					for(vector<ParseFunction*>::iterator it = functions.begin(), end = functions.end(); it != end; ++it)
-					{
-						if((*it)->name == s)
-							t.Throw(Format("Can't use '%s' as argument name, function with same name exists.", s.c_str()));
-					}
-					for(vector<ParseVar>::iterator it = top_function->vars.begin(), end = top_function->vars.end(); it != end; ++it)
-					{
-						if(it->name == s)
-							t.Throw(Format("Argument name '%s' is already used with type %s.", s.c_str(), var_name[it->type]));
-					}
-					ParseVar& arg = Add1(f->args);
-					arg.name = s;
-					arg.type = var_type;
-					arg.line = 0;
-					f->arg_types.push_back(arg.type);
-					t.Next();
-					// , or )
-					if(t.IsSymbol(','))
-						t.Next();
-				}
-				else if(t.IsSymbol(')'))
-				{
-					t.Next();
-					break;
-				}
-				else
-					t.Unexpected(2, Tokenizer::T_SPECIFIC_KEYWORD_GROUP, 2, Tokenizer::T_SPECIFIC_SYMBOL, ')');
-			}
-
-			// {
-			t.AssertSymbol('{');
-
-			// function code block
-			ParseFunction* prev_f = top_function;
-			top_function = f;
-			parse_block(f->nodes, '}');
-			
-			top_function = prev_f;			
-
-			// }
-			t.AssertSymbol('}');
-			t.Next();
-			return;
-		}
-		else
-		{
-			// it's a variable
-			if(v.type == V_VOID)
-				throw Format("Can't use void type variable '%s'.", v.name.c_str());
-			if(t.IsSymbol('='))
-			{
-				// variable assignment
-				t.Next();
-				Node* result = parse_expr(';', ',');
-				if(!result)
-					t.Throw(Format("Empty assign expression for var %s '%s'.", var_name[v.type], v.name.c_str()));
-				if(!CanCast(type, result->return_type))
-					t.Throw(Format("Can't assign to var %s '%s' value of type '%s'.", var_name[v.type], v.name.c_str(), var_name[result->return_type]));
-				Node* node = NodePool.Get();
-				node->op = Node::N_SET;
-				node->id = vi;
-				node->return_type = v.type;
-				if(type != result->return_type)
-				{
-					Node* cast = NodePool.Get();
-					cast->op = Node::N_CAST;
-					cast->return_type = type;
-					cast->nodes.push_back(result);
-					node->nodes.push_back(cast);
-				}
-				else
-					node->nodes.push_back(result);
-				cont.push_back(node);
-			}
-		}
-
-		first = false;
-
-		// next variable
-		if(t.IsSymbol(','))
-			t.Next();
-		else
-			break;
-	}
-	while(1);
-
-	t.AssertSymbol(';');
-	t.Next();
-}
-
-//=================================================================================================
 static Node* parse_return()
 {
 	t.Next();
@@ -796,41 +955,6 @@ static Node* parse_if()
 		t.Next();
 	}
 	return node;
-}
-
-//=================================================================================================
-static void parse_block(vector<Node*>& cont, char funcend)
-{
-	while(true)
-	{
-		if(funcend)
-		{
-			if(t.IsSymbol(funcend))
-				break;
-		}
-		else
-		{
-			if(t.IsEof())
-				break;
-		}
-
-		Node* node = NULL;
-		if(t.IsKeywordGroup(0))
-		{
-			Keyword k = (Keyword)t.GetKeywordId();
-			if(k == K_RETURN)
-				node = parse_return();
-			else
-				node = parse_if();
-		}
-		else if(t.IsKeywordGroup(2))
-			parse_vard(cont);
-		else
-			node = parse_exprl();
-
-		if(node)
-			cont.push_back(node);
-	}
 }
 
 //=================================================================================================

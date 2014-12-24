@@ -112,5 +112,8 @@
     <Text Include="tests\9.txt">
       <Filter>Tests</Filter>
     </Text>
+    <Text Include="structure.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
   </ItemGroup>
 </Project>

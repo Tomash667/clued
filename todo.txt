@@ -19,3 +19,4 @@
 + wykrywanie braku zwracanej wartoœci w return
 + niektóre Node leakuja gdy sie cos wysypie
 + if(const)
++ statementy które nic nie robi¹ "1;", "a;" "2+2"

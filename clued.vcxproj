@@ -102,6 +102,7 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="readme.txt" />
+    <Text Include="structure.txt" />
     <Text Include="tests\1.txt" />
     <Text Include="tests\2.txt" />
     <Text Include="tests\3.txt" />
