@@ -77,3 +77,18 @@ inline cstring OpChar(int op)
 		return "?";
 	}
 }
+
+//-------------------------------------------------------------------------------------------------
+struct OpInfo
+{
+	cstring name;
+	enum Arg
+	{
+		A_NONE,
+		A_BYTE,
+		A_SHORT,
+		A_INT,
+		A_FLOAT
+	} arg;
+};
+extern const OpInfo op_info[];

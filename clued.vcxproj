@@ -82,6 +82,7 @@
     <ClCompile Include="Base.cpp" />
     <ClCompile Include="Clued.cpp" />
     <ClCompile Include="Function.cpp" />
+    <ClCompile Include="Op.cpp" />
     <ClCompile Include="Parse.cpp" />
     <ClCompile Include="Run.cpp" />
     <ClCompile Include="Str.cpp" />
@@ -104,6 +105,7 @@
     <Text Include="readme.txt" />
     <Text Include="structure.txt" />
     <Text Include="tests\1.txt" />
+    <Text Include="tests\10.txt" />
     <Text Include="tests\2.txt" />
     <Text Include="tests\3.txt" />
     <Text Include="tests\4.txt" />

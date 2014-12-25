@@ -72,9 +72,14 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 			c += 4;
 			break;
 		case POP:
-			if(stack.back().type == V_STRING)
-				stack.back().str->Release();
-			stack.pop_back();
+			if (!stack.empty())
+			{
+				if (stack.back().type == V_STRING)
+					stack.back().str->Release();
+				stack.pop_back();
+			}
+			else
+				throw "Empty stack.";
 			break;
 		case SET_VARS:
 			func_vars = *c;
@@ -342,9 +347,9 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 		case CMP:
 			if(stack.size() >= 2)
 			{
-				Var a = stack.back();
+				Var b = stack.back();
 				stack.pop_back();
-				Var& b = stack.back();
+				Var& a = stack.back();
 				switch(a.type)
 				{
 				case V_INT:

@@ -1,0 +1,18 @@
+print("Podaj a: ");
+int a = getint();
+if(a >= 0)
+{
+	int b;
+	print("Podaj b: ");
+	a = b = getint();
+}
+else
+{
+	int b, c;
+	print("Podaj b i c: ");
+	b = getint();
+	c = getint();
+	a = b - c;
+}
+print("Nowe a: "+a);
+pause();
