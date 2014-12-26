@@ -239,7 +239,7 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 				cs.args_offset = stack.size();
 				c = code + sfuncs[b].pos;
 				vars_offset = vars.size();
-				func_vars = sfuncs[b].args;
+				func_vars = 0;
 			}
 			break;
 		case CAST:

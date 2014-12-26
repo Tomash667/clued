@@ -1,16 +1,16 @@
 print("Podaj a, b i c: ");
 float delta(float a, float b, float c)
 {
-	return b*b-4*a*c;
+	return pow(b*b-4*a*c, 0.5);
 }
 float a = getfloat(), b = getfloat(), c = getfloat(), d = delta(a,b,c);
 if(d > 0)
 {
 	float x1 = (-b - d)/(2*a),
 	      x2 = (-b + d)/(2*a);
-	printf("Wyniki: "+x1+" "+x2);
+	print("Wyniki: "+x1+" "+x2);
 }
-else if(delta == 0)
+else if(d == 0)
 {
 	float x1 = -b/(2*a);
 	print("Wynik: "+x1);
@@ -20,106 +20,3 @@ else
 	print("Brak wynikow.");
 }
 pause();
-
-/*
-function delta:
-push_arg, 0,
-push_arg, 0,
-mul,
-push_int, 4,
-cast, float,
-push_arg, 1,
-mul,
-push_arg, 2,
-mul,
-sub,
-ret
-*/
-
-/*
-set_vars, 6,
-push_cstr, 0,
-call, print,
-call, getfloat,
-set_var, 0,
-pop,
-call, getfloat,
-set_var, 1,
-pop,
-call, getfloat,
-set_var, 2,
-pop,
-push_var, 2,
-push_var, 1,
-push_var, 0,
-callf, delta,
-set_var, 3,
-pop,
-push_var, 3,
-push_int, 0,
-cast, float,
-cmp,
-jng, @0
-push_var, 1,
-neg,
-push, 3,
-sub,
-push_int, 2,
-cast, float,
-push_var, 0,
-mul,
-div,
-set_var, 4,
-pop,
-push_var, 1,
-neg,
-push, 3,
-add,
-push_int, 2,
-cast, float,
-push_var, 0,
-mul,
-div,
-set_var, 5,
-pop,
-push_cstr, 1,
-push_var, 4,
-cast, string,
-add,
-push_cstr, 2,
-add,
-push_var, 5,
-cast, string,
-add,
-call, print,
-jmp @2,
-
-@0:
-push_var, 3,
-push_int, 0,
-cast, float,
-cmp,
-jne, @1,
-push_var, 1,
-neg,
-push_int, 2,
-call, float,
-push_var, 0,
-mul,
-div,
-set_var, 4,
-pop,
-push_cstr, 3,
-push_var, 4,
-cast, string,
-add,
-call, print,
-jmp @2,
-
-@1:
-push_cstr, 4,
-call, print,
-@2:
-call, pause,
-ret
-*/

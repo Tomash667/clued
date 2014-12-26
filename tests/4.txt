@@ -5,21 +5,3 @@ int b = -getint();
 int c = -7;
 print("a: "+a+"\nb: "+b+"\nc: "+c);
 pause();
-
-/*
-...
-CALL, F_GETINT,
-SET_VAR, 0,
-POP,
-PUSH_VAR, 0,
-NEG,
-SET_VAR, 0,
-POP,
-CALL, F_GETINT,
-NEG,
-SET_VAR, 1,
-POP,
-PUSH_INT, -7,
-SET_VAR, 2,
-...
-*/

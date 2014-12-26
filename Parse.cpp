@@ -104,6 +104,7 @@ struct Node
 		N_CALL,
 		N_CALLF,
 		N_OP,
+		N_OPS,
 		N_VAR,
 		N_ARG,
 		N_SET,
@@ -114,7 +115,7 @@ struct Node
 		N_RETURN,
 		N_IF,
 		N_BLOCK,
-		N_POP
+		N_POP,
 	} op;
 	union
 	{
@@ -400,7 +401,7 @@ static Node* parse_basic_statement(ParseBlock* block)
 		// -a
 		t.Next();
 		Node* result = parse_basic_statement(block);
-		if (result->return_type == V_INT)
+		if (result->return_type == V_INT || result->return_type == V_FLOAT)
 		{
 			Node* node = create_node(Node::N_OP);
 			node->id = NEG;
@@ -408,13 +409,26 @@ static Node* parse_basic_statement(ParseBlock* block)
 			node->nodes.push_back(result);
 			return node;
 		}
+		else
+			t.Throw(Format("Can't use unrary minus on %s.", var_name[result->return_type]));
 	}
 	else if (t.IsSymbol('+'))
 	{
 		// +a
 		Node* result = parse_basic_statement(block);
-		if (result->return_type == V_INT)
+		if (result->return_type == V_INT || result->return_type == V_FLOAT)
 			return result;
+		else
+			t.Throw(Format("Can't use unrary plus on %s.", var_name[result->return_type]));
+	}
+	else if (t.IsSymbol('('))
+	{
+		// (
+		t.Next();
+		Node* result = parse_statement(block, ')');
+		t.AssertSymbol(')');
+		t.Next();
+		return result;
 	}
 
 	t.Unexpected();
@@ -640,14 +654,14 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 			{
 				// equals
 				t.Next();
-				Node* onode = create_node(Node::N_OP);
+				Node* onode = create_node(Node::N_OPS);
 				onode->id = JE;
 				node->nodes.push_back(onode);
 			}
 			break;
 		case '+':
 			{
-				Node* onode = create_node(Node::N_OP);
+				Node* onode = create_node(Node::N_OPS);
 				onode->id = ADD;
 				node->nodes.push_back(onode);
 				t.Next();
@@ -655,7 +669,7 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 			break;
 		case '-':
 			{
-				Node* onode = create_node(Node::N_OP);
+				Node* onode = create_node(Node::N_OPS);
 				onode->id = SUB;
 				node->nodes.push_back(onode);
 				t.Next();
@@ -663,7 +677,7 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 			break;
 		case '*':
 			{
-				Node* onode = create_node(Node::N_OP);
+				Node* onode = create_node(Node::N_OPS);
 				onode->id = MUL;
 				node->nodes.push_back(onode);
 				t.Next();
@@ -671,7 +685,7 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 			break;
 		case '/':
 			{
-				Node* onode = create_node(Node::N_OP);
+				Node* onode = create_node(Node::N_OPS);
 				onode->id = DIV;
 				node->nodes.push_back(onode);
 				t.Next();
@@ -679,7 +693,7 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 			break;
 		case '%':
 			{
-				Node* onode = create_node(Node::N_OP);
+				Node* onode = create_node(Node::N_OPS);
 				onode->id = MOD;
 				node->nodes.push_back(onode);
 				t.Next();
@@ -689,7 +703,7 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 			t.Next();
 			if (t.IsSymbol('='))
 			{
-				Node* onode = create_node(Node::N_OP);
+				Node* onode = create_node(Node::N_OPS);
 				onode->id = JNE;
 				node->nodes.push_back(onode);
 				t.Next();
@@ -699,7 +713,7 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 		case '>':
 			{
 				t.Next();
-				Node* onode = create_node(Node::N_OP);
+				Node* onode = create_node(Node::N_OPS);
 				if (t.IsSymbol('='))
 				{
 					onode->id = JGE;
@@ -713,7 +727,7 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 		case '<':
 			{
 				t.Next();
-				Node* onode = create_node(Node::N_OP);
+				Node* onode = create_node(Node::N_OPS);
 				if (t.IsSymbol('='))
 				{
 					onode->id = JLE;
@@ -745,7 +759,7 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 	for (vector<Node*>::iterator it = node->nodes.begin(), end = node->nodes.end(); it != end; ++it)
 	{
 		Node* n = *it;
-		if (n->op == Node::N_OP)
+		if (n->op == Node::N_OPS)
 		{
 			if (!node_stack.empty())
 			{
@@ -772,7 +786,7 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 	for (vector<Node*>::iterator it = node_out.begin(), end = node_out.end(); it != end; ++it)
 	{
 		Node* n = *it;
-		if (n->op == Node::N_OP)
+		if (n->op == Node::N_OPS)
 		{
 			Node* b = node->nodes.back();
 			node->nodes.pop_back();
@@ -806,6 +820,7 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 				n->nodes.push_back(b);
 			}
 			n->return_type = return_bool ? V_BOOL : result;
+			n->op = Node::N_OP;
 			node->nodes.push_back(n);
 		}
 		else

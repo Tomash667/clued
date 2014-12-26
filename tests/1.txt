@@ -4,20 +4,3 @@ print("test"); // kolejny koment
  komen
  tarz
 */pause(); // ???
-
-/*
-strings[1] = {
-	"test"
-};
-
-code[] = {
-	PUSH_CSTR, 0,
-	CALL, 0,
-	CALL, 1,
-	RET
-};
-
-expr = expr_code ;
-*/
-
-//return;

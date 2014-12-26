@@ -5,29 +5,3 @@ int d = getint();
 int e = a+b*c-d;
 print("Wynik: "+e);
 pause();
-
-/*
-SET_VARS, 4
-CALL, F_GETINT
-SET_VAR, 0,
-POP,
-CALL, F_GETINT,
-SET_VAR, 1,
-POP,
-CALL, F_GETINT,
-SET_VAR, 2,
-POP,
-CALL, F_GETINT,
-SET_VAR, 3,
-POP,
-PUSH_VAR, 0,
-PUSH_VAR, 1,
-PUSH_VAR, 2,
-MUL,
-ADD,
-PUSH_VAR, 3,
-SUB,
-CALL, F_PRINT,
-CALL, F_PAUSE,
-RET
-*/
