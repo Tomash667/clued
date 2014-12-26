@@ -56,7 +56,7 @@ void disasm(vector<byte>& code)
 int main()
 {
 	ParseOutput out;
-	if (parse("tests/10.txt", out))
+	if (parse("tests/quadric_eq.txt", out))
 	{
 		//disasm(out.code);
 		//printf("-------------------------\n");
