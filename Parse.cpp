@@ -124,6 +124,11 @@ struct Node
 	};
 	vector<Node*> nodes;
 	VAR return_type;
+
+	inline void push(Node* node)
+	{
+		nodes.push_back(node);
+	}
 };
 
 //=================================================================================================
@@ -272,6 +277,7 @@ static Node* parse_block(ParseBlock* block, char endc);
 static Node* parse_if(ParseBlock* block);
 static Node* parse_line_block(ParseBlock* block);
 static Node* parse_line(ParseBlock* block);
+static bool parse_op(ParseBlock* block, char endc, Node* node, Op oper, cstring oper_name);
 static Node* parse_return(ParseBlock* block);
 static Node* parse_statement(ParseBlock* block, char endc, char endc2 = 0);
 static Node* parse_vard(ParseBlock* block);
@@ -558,6 +564,82 @@ static Node* parse_line(ParseBlock* block)
 }
 
 //=================================================================================================
+static bool parse_op(ParseBlock* block, char endc, Node* node, Op oper, cstring oper_name)
+{
+	t.Next();
+	if (t.IsSymbol('='))
+	{
+		// compound operation
+		t.Next();
+		if (node->nodes.size() > 1 || node->nodes[0]->op != Node::N_VAR)
+			t.Throw(Format("Can't compund %s becouse lvalue is not var.", oper_name));
+		node->op = Node::N_SET;
+		node->id = node->nodes[0]->id;
+		node->return_type = node->nodes[0]->return_type;
+		node->nodes[0]->nodes.clear();
+		NodePool.Free(node->nodes[0]);
+		node->nodes.clear();
+
+		// parse rvalue
+		Node* result = parse_statement(block, endc);
+		ParseVar& v = *find_var(block, node->id);
+		if (!result)
+			t.Throw(Format("Can't compound %s empty expression to var %s '%s'.", oper_name, var_name[node->return_type], v.name.c_str()));
+		bool return_bool = false;
+		VAR return_type = CanOp(v.type, oper, result->return_type, return_bool);
+		if (return_type == V_VOID || return_bool)
+			t.Throw(Format("Can't compound %s variable %s '%s' and %s.", oper_name, var_name[node->return_type], v.name.c_str(), var_name[return_type]));
+
+		// create expression tree
+		Node* op = create_node(Node::N_OP);
+		op->id = oper;
+		op->return_type = return_type;
+		Node* get_var = create_node(Node::N_VAR);
+		get_var->id = v.index;
+		get_var->return_type = v.type;
+		if (v.type != return_type)
+		{
+			Node* cast = create_node(Node::N_CAST);
+			cast->id = return_type;
+			cast->return_type = return_type;
+			cast->push(get_var);
+			op->push(cast);
+		}
+		else
+			op->push(get_var);
+		if (result->return_type != return_type)
+		{
+			Node* cast = create_node(Node::N_CAST);
+			cast->id = return_type;
+			cast->return_type = return_type;
+			cast->push(result);
+			op->push(cast);
+		}
+		else
+			op->push(result);
+		if (v.type != return_type)
+		{
+			Node* cast = create_node(Node::N_CAST);
+			cast->id = v.type;
+			cast->return_type = v.type;
+			cast->push(op);
+			node->push(cast);
+		}
+		else
+			node->push(op);
+		return true;
+	}
+	else
+	{
+		// normal operation
+		Node* onode = create_node(Node::N_OPS);
+		onode->id = oper;
+		node->nodes.push_back(onode);
+		return false;
+	}
+}
+
+//=================================================================================================
 static Node* parse_return(ParseBlock* block)
 {
 	t.Next();
@@ -660,44 +742,24 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 			}
 			break;
 		case '+':
-			{
-				Node* onode = create_node(Node::N_OPS);
-				onode->id = ADD;
-				node->nodes.push_back(onode);
-				t.Next();
-			}
+			if (parse_op(block, endc, node, ADD, "add"))
+				return node;
 			break;
 		case '-':
-			{
-				Node* onode = create_node(Node::N_OPS);
-				onode->id = SUB;
-				node->nodes.push_back(onode);
-				t.Next();
-			}
+			if (parse_op(block, endc, node, SUB, "subtract"))
+				return node;
 			break;
 		case '*':
-			{
-				Node* onode = create_node(Node::N_OPS);
-				onode->id = MUL;
-				node->nodes.push_back(onode);
-				t.Next();
-			}
+			if (parse_op(block, endc, node, MUL, "multiply"))
+				return node;
 			break;
 		case '/':
-			{
-				Node* onode = create_node(Node::N_OPS);
-				onode->id = DIV;
-				node->nodes.push_back(onode);
-				t.Next();
-			}
+			if (parse_op(block, endc, node, DIV, "divide"))
+				return node;
 			break;
 		case '%':
-			{
-				Node* onode = create_node(Node::N_OPS);
-				onode->id = MOD;
-				node->nodes.push_back(onode);
-				t.Next();
-			}
+			if (parse_op(block, endc, node, MOD, "modulo"))
+				return node;
 			break;
 		case '!':
 			t.Next();

@@ -9,7 +9,6 @@
 + char
 + optymalizacja u¿ywania wartoœci ze stosu (np int x = getint(); if(x > 0) ...
 + optymalizacja litera³ów jako float jeœli potrzeba (np. float a = getfloat(); float = 2*a;) aktualnie to zrobi PUSH_INT, 2; CAST, FLOAT; PUSH_VAR, A; MUL
-+ compound assignment
 + ++ --
 + for
 + u¿ywanie zmiennych z poza funkcji
@@ -19,7 +18,9 @@
 + niektóre Node leakuja gdy sie cos wysypie
 + if(const)
 + statementy które nic nie robi¹ "1;", "a;" "2+2"
-+ nawiasy
-+ z³o¿one urary - + "-(3+4)"
 + if - optymalizacje, jeœli block jest pusty, jeœli else jest pusty
 + disasm - func name, cast type
++ brak leakow w ParseBlock i ParseFunction
++ operatory && ||
++ nie wywo³ywanie warunków w && i || jeœli nie potrzeba
++ var type bool
