@@ -8,14 +8,9 @@
 #include <cstdarg>
 
 //=================================================================================================
-void f_print()
+void f_print(Str* s)
 {
-	if(stack.empty())
-		throw "Empty stack!";
-	Var& v = stack.back();
-	printf(v.str->s.c_str());
-	v.str->Release();
-	stack.pop_back();
+	printf(s->s.c_str());
 }
 
 //=================================================================================================
@@ -25,65 +20,44 @@ void f_pause()
 }
 
 //=================================================================================================
-void f_getstr()
+Str* f_getstr()
 {
 	Str* s = StrPool.Get();
 	std::cin >> s->s;
 	s->refs = 1;
-	stack.push_back(Var(s));
+	return s;
 }
 
 //=================================================================================================
-void f_getint()
+int f_getint()
 {
 	int a;
 	std::cin >> a;
-	stack.push_back(Var(a));
+	return a;
 }
 
 //=================================================================================================
-void f_pow()
+float f_pow(float a, float b)
 {
-	if(stack.size() < 2)
-		throw "Empty stack!";
-	float a = stack.back().Float;
-	stack.pop_back();
-	float b = stack.back().Float;
-	stack.back().Float = pow(a, b);
+	return pow(a, b);
 }
 
 //=================================================================================================
-void f_getfloat()
+float f_getfloat()
 {
 	float a;
 	std::cin >> a;
-	stack.push_back(Var(a));
-}
-
-//=================================================================================================
-Function::Function(cstring name, VAR return_type, VoidF f, ...) : name(name), return_type(return_type), f(f)
-{
-	va_list a;
-	va_start(a, f);
-	while(true)
-	{
-		VAR type = va_arg(a, VAR);
-		if(type == V_VOID)
-			break;
-		else
-			args.push_back(type);
-	}
-	va_end(a);
+	return a;
 }
 
 //=================================================================================================
 const Function funcs[] = {
-	Function("print", V_VOID, f_print, V_STRING, V_VOID),
-	Function("pause", V_VOID, f_pause, V_VOID),
-	Function("getstr", V_STRING, f_getstr, V_VOID),
-	Function("getint", V_INT, f_getint, V_VOID),
-	Function("pow", V_FLOAT, f_pow, V_FLOAT, V_FLOAT, V_VOID),
-	Function("getfloat", V_FLOAT, f_getfloat, V_VOID)
+	"print", V_VOID, { V_STRING }, f_print,
+	"pause", V_VOID, {}, f_pause,
+	"getstr", V_STRING, {}, f_getstr,
+	"getint", V_INT, {}, f_getint,
+	"pow", V_FLOAT, { V_FLOAT, V_FLOAT }, f_pow,
+	"getfloat", V_FLOAT, {}, f_getfloat,
 };
 const int n_funcs = countof(funcs);
 
@@ -93,10 +67,75 @@ void pause()
 	_getch();
 }
 
+vector<Str*> str_to_pop;
+
 //=================================================================================================
 void call_func(int id)
 {
 	if(id >= n_funcs)
 		throw Format("Invalid function index %d.", id);
-	funcs[id].f();
+
+	// push args
+	const Function& f = funcs[id];
+	for (VAR v : f.args)
+	{
+		if (stack.empty())
+			throw Format("Empty stack for function %s.", f.name);
+		Var& v2 = stack.back();
+		if (v2.type != v)
+			throw "Argument missmatch.";
+		int a = v2.Int;
+		__asm
+		{
+			push a;
+		}
+		if (v2.type == V_STRING)
+			str_to_pop.push_back(v2.str);
+		stack.pop_back();
+	}
+
+	void* fptr = f.f;
+	int a = f.args.size() * 4;
+
+	// call
+	if (f.return_type != V_FLOAT)
+	{
+		int b;
+
+		__asm
+		{
+			call fptr;
+			mov eax, b;
+			add esp, a;
+		}
+
+		// result
+		if (f.return_type != V_VOID)
+		{
+			Var& v = Add1(stack);
+			v.type = f.return_type;
+			v.Int = b;
+		}
+	}
+	else
+	{
+		float b;
+
+		__asm
+		{
+			call fptr;
+			fstp b;
+			add esp, a;
+		}
+
+		Var& v = Add1(stack);
+		v.type = V_FLOAT;
+		v.Float = b;
+	}
+
+	// pop strings
+	for (Str* s : str_to_pop)
+	{
+		s->Release();
+	}
 }

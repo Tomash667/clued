@@ -1012,18 +1012,8 @@ static void parse_node(Node* node)
 {
 	if (node->op != Node::N_IF)
 	{
-		if (node->op == Node::N_CALL)
-		{
-			// calls push args from right to left
-			for (vector<Node*>::reverse_iterator it = node->nodes.rbegin(), end = node->nodes.rend(); it != end; ++it)
-				parse_node(*it);
-		}
-		else
-		{
-			// left to right
-			for (vector<Node*>::iterator it = node->nodes.begin(), end = node->nodes.end(); it != end; ++it)
-				parse_node(*it);
-		}
+		for (vector<Node*>::iterator it = node->nodes.begin(), end = node->nodes.end(); it != end; ++it)
+			parse_node(*it);
 	}
 	switch(node->op)
 	{

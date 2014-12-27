@@ -4,19 +4,13 @@
 #include "Var.h"
 
 //-------------------------------------------------------------------------------------------------
-// function pointer
-typedef void (*VoidF)();
-
-//-------------------------------------------------------------------------------------------------
 // function type
 struct Function
 {
 	cstring name;
 	VAR return_type;
 	vector<VAR> args;
-	VoidF f;
-
-	Function(cstring name, VAR return_type, VoidF f, ...);
+	void* f;
 };
 
 //-------------------------------------------------------------------------------------------------

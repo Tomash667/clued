@@ -49,7 +49,7 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 				if(callstack.empty() || b >= sfuncs[callstack.back().function].args)
 					throw Format("Invalid arg index %u.", b);
 				Callstack& cs = callstack.back();
-				uint offset = cs.args_offset - sfuncs[cs.function].args + b;
+				uint offset = cs.args_offset + b;
 				stack.push_back(Var(stack[offset]));
 				++c;
 			}
@@ -236,7 +236,7 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 				cs.function = b;
 				cs.return_pos = c;
 				cs.prev_func_vars = func_vars;
-				cs.args_offset = stack.size();
+				cs.args_offset = stack.size() - sfuncs[b].args;
 				c = code + sfuncs[b].pos;
 				vars_offset = vars.size();
 				func_vars = 0;
