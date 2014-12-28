@@ -107,6 +107,7 @@
     <Text Include="tests\1.txt" />
     <Text Include="tests\10.txt" />
     <Text Include="tests\11.txt" />
+    <Text Include="tests\12.txt" />
     <Text Include="tests\2.txt" />
     <Text Include="tests\3.txt" />
     <Text Include="tests\4.txt" />

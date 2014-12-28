@@ -56,7 +56,7 @@ void disasm(vector<byte>& code)
 int main()
 {
 	ParseOutput out;
-	if (parse("tests/11.txt", out))
+	if (parse("tests/12.txt", out))
 	{
 		//disasm(out.code);
 		//printf("-------------------------\n");

@@ -105,7 +105,7 @@ void call_func(int id)
 		__asm
 		{
 			call fptr;
-			mov eax, b;
+			mov b, eax;
 			add esp, a;
 		}
 

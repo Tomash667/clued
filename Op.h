@@ -24,13 +24,20 @@ enum Op : byte
 	CAST,
 	RET,
 	CMP,
+	TEST,
 	JMP,
 	JE,
 	JNE,
 	JG,
 	JGE,
 	JL,
-	JLE
+	JLE,
+	JES,
+	JNES,
+	JGS,
+	JGES,
+	JLS,
+	JLES
 };
 
 //-------------------------------------------------------------------------------------------------

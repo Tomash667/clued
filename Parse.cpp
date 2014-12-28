@@ -129,6 +129,11 @@ struct Node
 	{
 		nodes.push_back(node);
 	}
+
+	inline void clear()
+	{
+		nodes.clear();
+	}
 };
 
 //=================================================================================================
@@ -166,6 +171,11 @@ inline Node* create_node(Node::NodeOp op)
 	Node* node = NodePool.Get();
 	node->op = op;
 	return node;
+}
+inline void free_node(Node* node)
+{
+	node->clear();
+	NodePool.Free(node);
 }
 
 //=================================================================================================
@@ -305,11 +315,11 @@ static void parse_args(ParseBlock* block, Node* fnode, const string& name, const
 			{
 				Node* cast = create_node(Node::N_CAST);
 				cast->return_type = type;
-				cast->nodes.push_back(result);
-				fnode->nodes.push_back(cast);
+				cast->push(result);
+				fnode->push(cast);
 			}
 			else
-				fnode->nodes.push_back(result);
+				fnode->push(result);
 			t.Next();
 		}
 	}
@@ -412,7 +422,7 @@ static Node* parse_basic_statement(ParseBlock* block)
 			Node* node = create_node(Node::N_OP);
 			node->id = NEG;
 			node->return_type = V_INT;
-			node->nodes.push_back(result);
+			node->push(result);
 			return node;
 		}
 		else
@@ -467,9 +477,9 @@ static Node* parse_block(ParseBlock* block, char endc)
 			result = parse_line(block);
 		if(result)
 		{
-			node->nodes.push_back(result);
+			node->push(result);
 			if(result->return_type != V_VOID)
-				node->nodes.push_back(create_node(Node::N_POP));
+				node->push(create_node(Node::N_POP));
 		}
 	}
 
@@ -498,18 +508,18 @@ static Node* parse_if(ParseBlock* block)
 		t.Throw("Empty if expression.");
 	if(result->return_type != V_BOOL)
 		t.Throw("If expression must return bool.");
-	node->nodes.push_back(result);
+	node->push(result);
 	t.AssertSymbol(')');
 	t.Next();
 	// block, possibly added NULL Node
-	node->nodes.push_back(parse_line_block(block));
+	node->push(parse_line_block(block));
 	// else
 	if(t.IsKeyword(K_ELSE))
 	{
 		t.Next();
 		Node* else_block = parse_line_block(block);
 		if(else_block)
-			node->nodes.push_back(else_block);
+			node->push(else_block);
 	}
 	return node;
 }
@@ -576,8 +586,7 @@ static bool parse_op(ParseBlock* block, char endc, Node* node, Op oper, cstring 
 		node->op = Node::N_SET;
 		node->id = node->nodes[0]->id;
 		node->return_type = node->nodes[0]->return_type;
-		node->nodes[0]->nodes.clear();
-		NodePool.Free(node->nodes[0]);
+		free_node(node->nodes[0]);
 		node->nodes.clear();
 
 		// parse rvalue
@@ -634,7 +643,7 @@ static bool parse_op(ParseBlock* block, char endc, Node* node, Op oper, cstring 
 		// normal operation
 		Node* onode = create_node(Node::N_OPS);
 		onode->id = oper;
-		node->nodes.push_back(onode);
+		node->push(onode);
 		return false;
 	}
 }
@@ -671,11 +680,11 @@ static Node* parse_return(ParseBlock* block)
 	{
 		Node* cast = create_node(Node::N_CAST);
 		cast->return_type = block->function->return_type;
-		cast->nodes.push_back(result);
-		node->nodes.push_back(cast);
+		cast->push(result);
+		node->push(cast);
 	}
 	else
-		node->nodes.push_back(result);
+		node->push(result);
 	node->return_type = block->function->return_type;
 	return node;
 }
@@ -692,7 +701,7 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 	while (true)
 	{
 		Node* result = parse_basic_statement(block);
-		node->nodes.push_back(result);
+		node->push(result);
 
 		if (!t.IsSymbol())
 			t.Unexpected();
@@ -712,8 +721,7 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 				node->op = Node::N_SET;
 				node->id = node->nodes[0]->id;
 				node->return_type = node->nodes[0]->return_type;
-				node->nodes[0]->nodes.clear();
-				NodePool.Free(node->nodes[0]);
+				free_node(node->nodes[0]);
 				node->nodes.clear();
 				Node* result = parse_statement(block, endc);
 				ParseVar& v = *find_var(block, node->id);
@@ -725,11 +733,11 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 				{
 					Node* cast = create_node(Node::N_CAST);
 					cast->return_type = node->return_type;
-					cast->nodes.push_back(result);
-					node->nodes.push_back(cast);
+					cast->push(result);
+					node->push(cast);
 				}
 				else
-					node->nodes.push_back(result);
+					node->push(result);
 				return node;
 			}
 			else
@@ -738,7 +746,7 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 				t.Next();
 				Node* onode = create_node(Node::N_OPS);
 				onode->id = JE;
-				node->nodes.push_back(onode);
+				node->push(onode);
 			}
 			break;
 		case '+':
@@ -767,7 +775,7 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 			{
 				Node* onode = create_node(Node::N_OPS);
 				onode->id = JNE;
-				node->nodes.push_back(onode);
+				node->push(onode);
 				t.Next();
 			}
 			else
@@ -783,7 +791,7 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 				}
 				else
 					onode->id = JG;
-				node->nodes.push_back(onode);
+				node->push(onode);
 			}
 			break;
 		case '<':
@@ -797,7 +805,7 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 				}
 				else
 					onode->id = JL;
-				node->nodes.push_back(onode);
+				node->push(onode);
 			}
 			break;
 		default:
@@ -810,8 +818,7 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 	if (node->nodes.size() == 1)
 	{
 		Node* result = node->nodes[0];
-		node->nodes.clear();
-		NodePool.Free(node);
+		free_node(node);
 		return result;
 	}
 
@@ -860,39 +867,36 @@ static Node* parse_statement(ParseBlock* block, char endc, char endc2)
 				t.Throw(Format("Invalid operation %s %s %s.", var_name[a->return_type], OpChar(n->id), var_name[b->return_type]));
 			if (a->return_type != result)
 			{
-				Node* cast = NodePool.Get();
-				cast->op = Node::N_CAST;
+				Node* cast = create_node(Node::N_CAST);
 				cast->return_type = result;
-				cast->nodes.push_back(a);
-				n->nodes.push_back(cast);
-				n->nodes.push_back(b);
+				cast->push(a);
+				n->push(cast);
+				n->push(b);
 			}
 			else if (b->return_type != result)
 			{
-				n->nodes.push_back(a);
-				Node* cast = NodePool.Get();
-				cast->op = Node::N_CAST;
+				n->push(a);
+				Node* cast = create_node(Node::N_CAST);
 				cast->return_type = result;
-				cast->nodes.push_back(b);
-				n->nodes.push_back(cast);
+				cast->push(b);
+				n->push(cast);
 			}
 			else
 			{
-				n->nodes.push_back(a);
-				n->nodes.push_back(b);
+				n->push(a);
+				n->push(b);
 			}
-			n->return_type = return_bool ? V_BOOL : result;
+			n->return_type = (return_bool ? V_BOOL : result);
 			n->op = Node::N_OP;
-			node->nodes.push_back(n);
+			node->push(n);
 		}
 		else
-			node->nodes.push_back(n);
+			node->push(n);
 	}
 
 	// return result
 	Node* result = node->nodes[0];
-	node->nodes.clear();
-	NodePool.Free(node);
+	free_node(node);
 	return result;
 }
 
@@ -992,8 +996,7 @@ static Node* parse_vard(ParseBlock* block)
 			// function code block
 			Node* result = parse_block(f->block, '}');
 			f->nodes = result->nodes;
-			result->nodes.clear();
-			NodePool.Free(result);
+			free_node(result);
 
 			// }
 			t.AssertSymbol('}');
@@ -1023,16 +1026,15 @@ static Node* parse_vard(ParseBlock* block)
 				node->return_type = v.type;
 				if(type != result->return_type)
 				{
-					Node* cast = NodePool.Get();
-					cast->op = Node::N_CAST;
+					Node* cast = create_node(Node::N_CAST);
 					cast->return_type = type;
-					cast->nodes.push_back(result);
-					node->nodes.push_back(cast);
+					cast->push(result);
+					node->push(cast);
 				}
 				else
-					node->nodes.push_back(result);
-				cont->nodes.push_back(node);
-				cont->nodes.push_back(create_node(Node::N_POP));
+					node->push(result);
+				cont->push(node);
+				cont->push(create_node(Node::N_POP));
 			}
 		}
 
@@ -1070,7 +1072,7 @@ static void apply_jump(int id)
 }
 
 //=================================================================================================
-static void parse_node(Node* node)
+static void parse_node(Node* node, bool inside_if=false)
 {
 	if (node->op != Node::N_IF)
 	{
@@ -1097,7 +1099,10 @@ static void parse_node(Node* node)
 		else
 		{
 			code->push_back(CMP);
-			code->push_back(node->id);
+			if (inside_if)
+				code->push_back(node->id);
+			else
+				code->push_back(node->id + 6);
 		}
 		break;
 	case Node::N_VAR:
@@ -1137,7 +1142,12 @@ static void parse_node(Node* node)
 	case Node::N_IF:
 	{
 		// if expression
-		parse_node(node->nodes[0]);
+		parse_node(node->nodes[0], true);
+		if (node->nodes[0]->op != Node::N_OPS)
+		{
+			code->push_back(TEST);
+			code->push_back(JE);
+		}
 		int jid = add_jump();
 		code->push_back(0);
 		code->push_back(0);
@@ -1172,10 +1182,10 @@ static void parse_node(Node* node)
 }
 
 //=================================================================================================
-static void free_node(Node* node)
+static void clean_node(Node* node)
 {
 	for(vector<Node*>::iterator it = node->nodes.begin(), end = node->nodes.end(); it != end; ++it)
-		free_node(*it);
+		clean_node(*it);
 	node->nodes.clear();
 	NodePool.Free(node);
 }
@@ -1193,6 +1203,7 @@ bool parse(cstring file, ParseOutput& out)
 	for(int i=0; i<n_funcs; ++i)
 		t.AddKeyword(funcs[i].name, i, 1);
 	t.AddKeyword("void", V_VOID, 2);
+	t.AddKeyword("bool", V_BOOL, 2);
 	t.AddKeyword("int", V_INT, 2);
 	t.AddKeyword("float", V_FLOAT, 2);
 	t.AddKeyword("string", V_STRING, 2);
@@ -1220,8 +1231,7 @@ bool parse(cstring file, ParseOutput& out)
 		t.Next();
 		Node* result = parse_block(f->block, 0);
 		f->nodes = result->nodes;
-		result->nodes.clear();
-		NodePool.Free(result);
+		free_node(result);
 	}
 	catch(cstring err)
 	{
@@ -1249,7 +1259,7 @@ bool parse(cstring file, ParseOutput& out)
 		for(vector<Node*>::iterator it = f.nodes.begin(), end = f.nodes.end(); it != end; ++it)
 		{
 			parse_node(*it);
-			free_node(*it);
+			clean_node(*it);
 		}
 		if(code->back() != RET)
 			code->push_back(RET);

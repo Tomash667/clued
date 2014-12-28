@@ -255,9 +255,38 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 				case V_VOID:
 					invalid = true;
 					break;
+				case V_BOOL:
+					switch (type)
+					{
+					case V_BOOL:
+						break;
+					case V_INT:
+						v.Int = (v.Bool ? 1 : 0);
+						v.type = V_INT;
+						break;
+					case V_FLOAT:
+						v.Float = (v.Bool ? 1.0f : 0.f);
+						v.type = V_FLOAT;
+						break;
+					case V_STRING:
+						s = (v.Bool ? "1" : "0");
+						v.str = StrPool.Get();
+						v.str->s = s;
+						v.str->refs = 1;
+						v.type = V_STRING;
+						break;
+					default:
+						invalid = true;
+						break;
+					}
+					break;
 				case V_INT:
 					switch(type)
 					{
+					case V_BOOL:
+						v.Bool = (v.Int != 0);
+						v.type = V_BOOL;
+						break;
 					case V_INT:
 						break;
 					case V_FLOAT:
@@ -279,6 +308,10 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 				case V_FLOAT:
 					switch(type)
 					{
+					case V_BOOL:
+						v.Bool = (v.Float != 0.f);
+						v.type = V_BOOL;
+						break;
 					case V_INT:
 						v.Int = (int)v.Float;
 						v.type = V_INT;
@@ -352,6 +385,12 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 				Var& a = stack.back();
 				switch(a.type)
 				{
+				case V_BOOL:
+					if (a.Bool == b.Bool)
+						cmp_result = 0;
+					else
+						cmp_result = 1;
+					break;
 				case V_INT:
 					if(a.Int > b.Int)
 						cmp_result = 1;
@@ -380,6 +419,18 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 					cmp_result = 1;
 					break;
 				}
+				stack.pop_back();
+			}
+			else
+				throw "Empty stack!";
+			break;
+		case TEST:
+			if (!stack.empty())
+			{
+				if (stack.back().Bool)
+					cmp_result = 0;
+				else
+					cmp_result = 1;
 				stack.pop_back();
 			}
 			else
@@ -444,6 +495,24 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 				else
 					c += 2;
 			}
+			break;
+		case JES:
+			stack.push_back(Var(cmp_result == 0));
+			break;
+		case JNES:
+			stack.push_back(Var(cmp_result != 0));
+			break;
+		case JGS:
+			stack.push_back(Var(cmp_result > 0));
+			break;
+		case JGES:
+			stack.push_back(Var(cmp_result >= 0));
+			break;
+		case JLS:
+			stack.push_back(Var(cmp_result < 0));
+			break;
+		case JLES:
+			stack.push_back(Var(cmp_result <= 0));
 			break;
 		default:
 			throw Format("Unknown op code %d!", op);

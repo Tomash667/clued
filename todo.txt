@@ -23,4 +23,8 @@
 + brak leakow w ParseBlock i ParseFunction
 + operatory && ||
 + nie wywo³ywanie warunków w && i || jeœli nie potrzeba
-+ var type bool
++ optymalizacja: (x == 0) -> (x)
++ true, false
++ if ? true : false
++ if(var int) itp
++ lepsza budowa ifa, aktualnie jest skok nad jumpem dla else i skok do else, trzeba zrobiæ ¿e skok jest dla else a dla true nie ma

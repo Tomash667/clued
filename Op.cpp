@@ -22,6 +22,7 @@ const OpInfo op_info[] = {
 	"CAST", OpInfo::A_BYTE,
 	"RET", OpInfo::A_NONE,
 	"CMP", OpInfo::A_NONE,
+	"TEST", OpInfo::A_NONE,
 	"JMP", OpInfo::A_SHORT,
 	"JE", OpInfo::A_SHORT,
 	"JNE", OpInfo::A_SHORT,
@@ -29,4 +30,10 @@ const OpInfo op_info[] = {
 	"JGE", OpInfo::A_SHORT,
 	"JL", OpInfo::A_SHORT,
 	"JLE", OpInfo::A_SHORT,
+	"JES", OpInfo::A_NONE,
+	"JNES", OpInfo::A_NONE,
+	"JGS", OpInfo::A_NONE,
+	"JGES", OpInfo::A_NONE,
+	"JLS", OpInfo::A_NONE,
+	"JLES", OpInfo::A_NONE,
 };
