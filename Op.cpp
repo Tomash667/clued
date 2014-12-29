@@ -3,8 +3,11 @@
 #include "Op.h"
 
 const OpInfo op_info[] = {
+	"PUSH_TRUE", OpInfo::A_NONE,
+	"PUSH_FALSE", OpInfo::A_NONE,
 	"PUSH_VAR", OpInfo::A_BYTE,
 	"PUSH_ARG", OpInfo::A_BYTE,
+	"PUSH_CHAR", OpInfo::A_BYTE,
 	"PUSH_CSTR", OpInfo::A_BYTE,
 	"PUSH_INT", OpInfo::A_INT,
 	"PUSH_FLOAT", OpInfo::A_FLOAT,

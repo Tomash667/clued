@@ -8,5 +8,6 @@ cstring var_name[] = {
 	"bool",
 	"int",
 	"float",
+	"char",
 	"string"
 };

@@ -28,3 +28,4 @@
 + if ? true : false
 + if(var int) itp
 + lepsza budowa ifa, aktualnie jest skok nad jumpem dla else i skok do else, trzeba zrobiæ ¿e skok jest dla else a dla true nie ma
++ zabronienie funkcji w funkcji

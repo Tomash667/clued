@@ -34,6 +34,12 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 		++c;
 		switch(op)
 		{
+		case PUSH_TRUE:
+			stack.push_back(Var(true));
+			break;
+		case PUSH_FALSE:
+			stack.push_back(Var(false));
+			break;
 		case PUSH_VAR:
 			{
 				byte b = *c + vars_offset;
@@ -52,6 +58,13 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 				uint offset = cs.args_offset + b;
 				stack.push_back(Var(stack[offset]));
 				++c;
+			}
+			break;
+		case PUSH_CHAR:
+			{
+				char ch = (char)*c;
+				++c;
+				stack.push_back(Var(ch));
 			}
 			break;
 		case PUSH_CSTR:

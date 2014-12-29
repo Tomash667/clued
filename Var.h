@@ -11,6 +11,7 @@ enum VAR
 	V_BOOL,
 	V_INT,
 	V_FLOAT,
+	V_CHAR,
 	V_STRING
 };
 
@@ -28,8 +29,9 @@ inline bool CanCast(VAR to, VAR from)
 	switch(to)
 	{
 	case V_VOID:
+		return false;
 	case V_INT:
-		if(from == V_FLOAT)
+		if(from == V_FLOAT || from == V_CHAR)
 			return true;
 		return false;
 	case V_FLOAT:
@@ -38,6 +40,10 @@ inline bool CanCast(VAR to, VAR from)
 		return false;
 	case V_STRING:
 		return from != V_VOID;
+	case V_CHAR:
+		if(from == V_INT)
+			return true;
+		return false;
 	default:
 		return false;
 	}
@@ -52,6 +58,7 @@ struct Var
 		bool Bool;
 		int Int;
 		float Float;
+		char Char;
 		Str* str;
 	};
 	VAR type;
@@ -60,6 +67,7 @@ struct Var
 	Var(bool Bool) : Bool(Bool), type(V_BOOL) {}
 	Var(int Int) : Int(Int), type(V_INT) {}
 	Var(float Float) : Float(Float), type(V_FLOAT) {}
+	Var(char Char) : Char(Char), type(V_CHAR) {}
 	Var(Str* str) : str(str), type(V_STRING) { str->refs++; }
 	Var(const Var& v)
 	{

@@ -5,8 +5,11 @@
 // op codes
 enum Op : byte
 {
+	PUSH_TRUE,
+	PUSH_FALSE,
 	PUSH_VAR,
 	PUSH_ARG,
+	PUSH_CHAR,
 	PUSH_CSTR,
 	PUSH_INT,
 	PUSH_FLOAT,
@@ -92,6 +95,7 @@ struct OpInfo
 	enum Arg
 	{
 		A_NONE,
+		A_CHAR,
 		A_BYTE,
 		A_SHORT,
 		A_INT,
