@@ -15,4 +15,4 @@ struct ParseOutput
 
 //-------------------------------------------------------------------------------------------------
 // parse code from file
-bool parse(cstring file, ParseOutput& out);
+bool parse(cstring file, ParseOutput& out, bool halt);

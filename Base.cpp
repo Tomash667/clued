@@ -107,7 +107,11 @@ bool LoadFileToString(cstring path, string& str)
 	DWORD size = GetFileSize(file, NULL);
 	str.resize(size);
 
-	ReadFile(file, (char*)str.c_str(), size, &tmp, NULL);
+	if(ReadFile(file, (char*)str.c_str(), size, &tmp, NULL) == FALSE)
+	{
+		CloseHandle(file);
+		return false;
+	}
 
 	CloseHandle(file);
 

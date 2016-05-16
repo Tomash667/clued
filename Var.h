@@ -73,7 +73,12 @@ struct Var
 	{
 		type = v.type;
 		str = v.str;
+		Release();
+	}
+
+	inline void Release()
+	{
 		if(type == V_STRING)
-			str->refs++;
+			str->Release();
 	}
 };

@@ -46,6 +46,7 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 				if(b >= vars.size())
 					throw Format("Invalid var index %u.", b-vars_offset);
 				stack.push_back(Var(vars[b]));
+				vars[b].Release();
 				++c;
 			}
 			break;
@@ -57,6 +58,7 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 				Callstack& cs = callstack.back();
 				uint offset = cs.args_offset + b;
 				stack.push_back(Var(stack[offset]));
+				stack[offset].Release();
 				++c;
 			}
 			break;
@@ -534,8 +536,10 @@ void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 }
 
 //=================================================================================================
-void try_run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
+bool try_run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs, bool halt)
 {
+	bool errored = false;
+
 	try
 	{
 		run(code, strs, sfuncs);
@@ -545,7 +549,9 @@ void try_run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 	catch(cstring err)
 	{
 		printf("CLUED RUNTIME ERROR: %s", err);
-		pause();
+		if(halt)
+			pause();
+		errored = true;
 	}
 
 	for(vector<Var>::iterator it = stack.begin(), end = stack.end(); it != end; ++it)
@@ -561,4 +567,6 @@ void try_run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs)
 
 	stack.clear();
 	vars.clear();
+
+	return errored;
 }

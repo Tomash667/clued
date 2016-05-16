@@ -11,4 +11,4 @@ extern vector<Var> stack;
 //-------------------------------------------------------------------------------------------------
 // run program
 void run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs);
-void try_run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs);
+bool try_run(byte* code, vector<Str*>& strs, vector<ScriptFunction>& sfuncs, bool halt);

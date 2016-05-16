@@ -172,6 +172,8 @@ inline Node* create_node(Node::NodeOp op)
 	node->op = op;
 	return node;
 }
+
+//=================================================================================================
 inline void free_node(Node* node)
 {
 	node->clear();
@@ -1191,7 +1193,7 @@ static void clean_node(Node* node)
 }
 
 //=================================================================================================
-bool parse(cstring file, ParseOutput& out)
+bool parse(cstring file, ParseOutput& out, bool halt)
 {
 	strs = &out.strs;
 	code = &out.code;
@@ -1210,6 +1212,8 @@ bool parse(cstring file, ParseOutput& out)
 	if(!t.FromFile(file))
 	{
 		printf("CLUED PARSE ERROR: Can't open file '%s'.", file);
+		if(halt)
+			pause();
 		return false;
 	}
 
@@ -1236,7 +1240,16 @@ bool parse(cstring file, ParseOutput& out)
 	catch(cstring err)
 	{
 		printf("CLUED PARSE ERROR: %s", err);
-		pause();
+		if(halt)
+			pause();
+		for(vector<ParseFunction*>::iterator it = functions.begin(), end = functions.end(); it != end; ++it)
+		{
+			ParseFunction& f = **it;
+			for(vector<Node*>::iterator it2 = f.nodes.begin(), end2 = f.nodes.end(); it2 != end2; ++it2)
+				clean_node(*it2);
+			FunctionPool.Free(*it);
+		}
+		functions.clear();
 		return false;
 	}
 
@@ -1256,14 +1269,16 @@ bool parse(cstring file, ParseOutput& out)
 			code->push_back(SET_VARS);
 			code->push_back(f.block->max_vars);
 		}
-		for(vector<Node*>::iterator it = f.nodes.begin(), end = f.nodes.end(); it != end; ++it)
+		for(vector<Node*>::iterator it2 = f.nodes.begin(), end2 = f.nodes.end(); it2 != end2; ++it2)
 		{
-			parse_node(*it);
-			clean_node(*it);
+			parse_node(*it2);
+			clean_node(*it2);
 		}
 		if(code->back() != RET)
 			code->push_back(RET);
+		FunctionPool.Free(*it);
 	}
+	functions.clear();
 
 	return true;
 }
